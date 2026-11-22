@@ -42,6 +42,7 @@ from core.providers.tts.dto.dto import ContentType, TTSMessageDTO, SentenceType
 from config.logger import setup_logging, build_module_string, create_connection_logger
 from config.manage_api_client import DeviceNotFoundException, DeviceBindException, generate_and_save_chat_title
 from core.utils.prompt_manager import PromptManager
+from core.utils.tool_call_runner import ToolCallRunner
 from core.utils.voiceprint_provider import VoiceprintProvider
 from core.utils.util import get_system_error_response
 from core.utils import textUtils
@@ -214,8 +215,13 @@ class ConnectionHandler:
                 self.client_ip = real_ip.split(",")[0].strip()
             else:
                 self.client_ip = ws.remote_address[0]
+            # 日志中脱敏认证类请求头，避免 token 泄露（Authorization/Cookie 等）
+            safe_headers = {
+                k: ("***" if k.lower() in ("authorization", "cookie", "set-cookie") else v)
+                for k, v in self.headers.items()
+            }
             self.logger.bind(tag=TAG).info(
-                f"{self.client_ip} conn - Headers: {self.headers}"
+                f"{self.client_ip} conn - Headers: {safe_headers}"
             )
 
             self.device_id = self.headers.get("device-id", None)
@@ -1324,80 +1330,19 @@ class ConnectionHandler:
                     self.dialogue.put(Message(role="assistant", content=streamed_text))
                 response_message.clear()
 
-                # 收集所有工具调用的 Future
-                futures_with_data = []
-                for tool_call_data in tool_calls_list:
-                    self.logger.bind(tag=TAG).debug(
-                        f"function_name={tool_call_data['name']}, function_id={tool_call_data['id']}, function_arguments={tool_call_data['arguments']}"
-                    )
-
-                    # 使用公共方法上报工具调用
-                    tool_input = json.loads(tool_call_data.get("arguments") or "{}")
-                    enqueue_tool_report(self, tool_call_data['name'], tool_input)
-
-                    future = asyncio.run_coroutine_threadsafe(
-                        self.func_handler.handle_llm_function_call(
-                            self, tool_call_data
-                        ),
-                        self.loop,
-                    )
-                    futures_with_data.append((future, tool_call_data, tool_input))
-
-                # 工具调用超时时间，可配置，默认30秒
-                tool_call_timeout = int(self.config.get("tool_call_timeout", 30))
-                # 等待协程结束（实际等待时长为最慢的那个）
-                tool_results = []
-
-                for future, tool_call_data, tool_input in futures_with_data:
-                    try:
-                        result = future.result(timeout=tool_call_timeout)
-                        tool_results.append((result, tool_call_data))
-                        # 使用公共方法上报工具调用结果
-                        enqueue_tool_report(self, tool_call_data['name'], tool_input, str(result.result) if result.result else None, report_tool_call=False)
-
-                    except Exception as e:
-                        # 超时/异常时必须取消后台任务，否则写操作会在超时后继续执行（#3566）
-                        cancelled = future.cancel()
-                        self.logger.bind(tag=TAG).error(
-                            f"工具调用超时或异常: {tool_call_data['name']}, 错误: {e}, 已取消后台任务: {cancelled}"
-                        )
-                        # 把本次工具调用与失败结果写入对话历史，避免模型/用户误以为没调用过而重试（#3566）
-                        failed_tool_call_id = (
-                            str(uuid.uuid4())
-                            if tool_call_data["id"] is None
-                            else tool_call_data["id"]
-                        )
-                        self.dialogue.put(
-                            Message(
-                                role="assistant",
-                                tool_calls=[
-                                    {
-                                        "id": failed_tool_call_id,
-                                        "function": {
-                                            "arguments": tool_call_data["arguments"]
-                                            or "{}",
-                                            "name": tool_call_data["name"],
-                                        },
-                                        "type": "function",
-                                        "index": 0,
-                                    }
-                                ],
-                            )
-                        )
-                        self.dialogue.put(
-                            Message(
-                                role="tool",
-                                tool_call_id=failed_tool_call_id,
-                                content=f"工具调用超时（{tool_call_timeout}秒）或异常，后台任务已取消：{e}",
-                            )
-                        )
-                        # 超时时返回错误响应，避免整个流程卡死
-                        tool_results.append((
-                            ActionResponse(action=Action.ERROR, result="哎呀，网络遇到点问题，请稍后再试下！"),
-                            tool_call_data
-                        ))
-                        # 上报工具调用错误
-                        enqueue_tool_report(self, tool_call_data['name'], tool_input, str(e), report_tool_call=False)
+                # 工具调用：并发执行、超时取消、失败写入对话历史统一由 ToolCallRunner 负责
+                tool_call_runner = ToolCallRunner(
+                    self,
+                    loop=self.loop,
+                    func_handler=self.func_handler,
+                    dialogue=self.dialogue,
+                    config=self.config,
+                    logger=self.logger,
+                    report_func=lambda *args, **kwargs: enqueue_tool_report(
+                        self, *args, **kwargs
+                    ),
+                )
+                tool_results = tool_call_runner.run(tool_calls_list)
 
                 # 统一处理工具调用结果
                 if tool_results:
