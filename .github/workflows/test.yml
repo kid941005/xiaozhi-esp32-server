@@ -32,19 +32,17 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install pytest pytest-asyncio freezegun
-      - name: Prepare test config
-        working-directory: main/xiaozhi-server
-        run: |
-          # config/settings.py 在 import 期就要这个文件，缺了整套用例连收集都过不去。
-          # data/ 在 .gitignore 里，只能由这一步现造
-          mkdir -p data
-          printf '{}\n' > data/.config.yaml
       - name: Run tests
         working-directory: main/xiaozhi-server
+        # 与本地开发跑的是同一个入口（scripts/run_tests.sh）：
+        #   - 自行校验 libopus 是否真能编解码，缺库时才装（本 job 上一步已装，这里会跳过）
+        #   - 自行创建 data/.config.yaml（data/ 在 .gitignore 里，CI 上没有这个文件）
+        #   - 自动探测 cnlunar / markitdown，缺哪个只 ignore 对应那个测试文件
+        #   - 额外参数原样透传给 pytest
         run: |
           # Edge TTS 那条要连微软公网，runner 的出口 IP 会被风控挡掉，先排除。
           # 根治办法是给它打 live 标记，让 mock 模式下自动不收（另开一条改）
-          pytest tests/ -v -k "not test_tts_text_to_speak_writes_file"
+          bash scripts/run_tests.sh -k "not test_tts_text_to_speak_writes_file"
 
   java:
     name: Java (manager-api)
@@ -80,13 +78,9 @@ jobs:
           java-version: '21'
           cache: 'maven'
       - name: Run tests
-        working-directory: main/manager-api
-        run: mvn -B test -DskipTests=false -DfailIfNoTests=false
-      - name: Check the integration tests really ran
-        working-directory: main/manager-api
-        # 守卫在依赖不齐时会把整类集成测试跳过，这里盯一下它们有没有真跑，
-        # 免得门禁被悄悄掏空
-        run: bash scripts/check-integration-tests.sh
+        # 统一入口：mvn test 与「集成测试是否真跑了」的守卫都在
+        # main/manager-api/scripts/run_tests.sh 里，本地跑的是同一条命令
+        run: bash scripts/run_tests.sh java
 
   web:
     name: Vue (manager-web)
@@ -98,10 +92,11 @@ jobs:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: main/manager-web/package-lock.json
-      - name: Run tests
+      - name: Install dependencies
         working-directory: main/manager-web
-        run: |
-          npm ci --no-audit --no-fund
-          npm run test:contract
-          npm run test:unit
-          npm run build
+        # 单独保留：CI 要命中 setup-node 的 npm 缓存，且要锁定 lockfile 解析结果；
+        # 下面的统一入口检测到 node_modules 已存在就不会重复安装
+        run: npm ci --no-audit --no-fund
+      - name: Run tests
+        # 统一入口：契约测试 + 单元测试 + 生产构建
+        run: bash scripts/run_tests.sh web

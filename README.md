@@ -214,6 +214,8 @@ Websocket接口地址: wss://2662r3426b.vicp.fun/xiaozhi/v1/
 |:---:|:---|:---:|:---:|
 | 音频交互测试工具 | main》digital-human》index.html | 在 `main/digital-human` 按其 README 装好依赖后执行 `python start.py`，然后访问 `http://127.0.0.1:8006/index.html` | 测试音频播放和接收功能，验证Python端音频处理是否正常 |
 | 模型响应测试工具 | main》xiaozhi-server》performance_tester.py | 执行 `python performance_tester.py` | 测试ASR(语音识别)、LLM(大模型)、VLLM(视觉模型)、TTS(语音合成)等核心模块的响应速度 |
+| 本地单元测试环境 | main》xiaozhi-server》scripts | 在 `main/xiaozhi-server` 执行 `bash scripts/run_tests.sh` | 一键准备 libopus 与测试配置后跑 pytest，详见 [docs/local-test-setup.md](./docs/local-test-setup.md) |
+| 全项目统一测试入口 | scripts》run_tests.sh | 在仓库根执行 `bash scripts/run_tests.sh [python\|java\|web\|all]` | 与 CI 同一条命令，一条命令覆盖 xiaozhi-server(Python)、manager-api(Java)、manager-web(前端) |
 
 > 💡 提示：测试模型速度时，只会测试配置了密钥的模型。
 
