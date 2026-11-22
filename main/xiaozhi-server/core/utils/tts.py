@@ -108,7 +108,16 @@ class MarkdownCleaner:
         (re.compile(r'```.*?```', re.DOTALL), ''),  # 代码块
         (re.compile(r'^#+\s*', re.MULTILINE), ''),  # 标题
         (re.compile(r'(\*\*|__)(.*?)\1'), r'\2'),  # 粗体
-        (re.compile(r'(\*|_)(?=\S)(.*?)(?<=\S)\1'), r'\2'),  # 斜体
+        # 斜体：* 仅在两侧都不是字母/数字时才算斜体标记（避免吃掉 2*3*4 的乘号）
+        (
+            re.compile(r'(?<![A-Za-z0-9])\*(?=\S)(.*?)(?<=\S)\*(?![A-Za-z0-9])'),
+            r'\1',
+        ),
+        # 斜体：_ 仅在两侧都不是字母/数字/下划线时才算（避免吃掉 get_current_time 这类标识符）
+        (
+            re.compile(r'(?<![A-Za-z0-9_])_(?=\S)(.*?)(?<=\S)_(?![A-Za-z0-9_])'),
+            r'\1',
+        ),
         (re.compile(r'!\[.*?\]\(.*?\)'), ''),  # 图片
         (re.compile(r'\[(.*?)\]\(.*?\)'), r'\1'),  # 链接
         (re.compile(r'^\s*>+\s*', re.MULTILINE), ''),  # 引用
@@ -130,6 +139,8 @@ class MarkdownCleaner:
         """
         主入口方法：依序执行所有正则，移除或替换 Markdown 元素
         """
+        # 数字之间的下划线是千分位/分隔符而非 Markdown：1_000_000 -> 1000000
+        text = re.sub(r'(?<=\d)_(?=\d)', '', text)
         for regex, replacement in MarkdownCleaner.REGEXES:
             text = regex.sub(replacement, text)
 

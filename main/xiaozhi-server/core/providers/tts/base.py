@@ -503,6 +503,20 @@ class TTSProviderBase(ABC):
     _CLOSERS = '」』”》）"»“】〉］]'
     _QUOTE_CHARS = "".join(ch for pair in _QUOTE_PAIRS for ch in pair)
 
+    # 数字内部的千分位/时间分隔符，不能当作句末断句标点（#3553）
+    _NUMERIC_SEPARATORS = {"，", ",", "：", ":"}
+
+    @classmethod
+    def _is_numeric_separator(cls, text: str, index: int) -> bool:
+        """判断 text[index] 是否是夹在数字之间的分隔符（如 1,280 / 15：30）。"""
+        ch = text[index]
+        if ch not in cls._NUMERIC_SEPARATORS:
+            return False
+        if index == 0 or not text[index - 1].isdigit():
+            return False
+        nxt = text[index + 1] if index + 1 < len(text) else ""
+        return nxt == "" or nxt.isdigit()
+
     @classmethod
     def _quote_safe_cut(cls, text: str, pos: int, punctuations) -> int:
         """避免在引号内切分（如 「わぁ！」って / “好！”他说）。
@@ -514,7 +528,11 @@ class TTSProviderBase(ABC):
             # 全文不含引号/括号：不存在未闭合引号，右引号也无需携带，候选位置必然安全
             return pos
         candidates = [pos] + [
-            i for i, ch in enumerate(text) if i > pos and ch in punctuations
+            i
+            for i, ch in enumerate(text)
+            if i > pos
+            and ch in punctuations
+            and not cls._is_numeric_separator(text, i)
         ]
         for candidate in candidates:
             end = candidate + 1
@@ -561,7 +579,9 @@ class TTSProviderBase(ABC):
         # 取每种标点最后出现位置的最早者作为切分点（与逐个 rfind 再取最小值等价）
         last_seen = {}
         for i, ch in enumerate(current_text):
-            if ch in punctuations_to_use:
+            if ch in punctuations_to_use and not self._is_numeric_separator(
+                current_text, i
+            ):
                 last_seen[ch] = i
         last_punct_pos = min(last_seen.values(), default=-1)
 

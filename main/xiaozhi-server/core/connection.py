@@ -1356,8 +1356,40 @@ class ConnectionHandler:
                         enqueue_tool_report(self, tool_call_data['name'], tool_input, str(result.result) if result.result else None, report_tool_call=False)
 
                     except Exception as e:
+                        # 超时/异常时必须取消后台任务，否则写操作会在超时后继续执行（#3566）
+                        cancelled = future.cancel()
                         self.logger.bind(tag=TAG).error(
-                            f"工具调用超时或异常: {tool_call_data['name']}, 错误: {e}"
+                            f"工具调用超时或异常: {tool_call_data['name']}, 错误: {e}, 已取消后台任务: {cancelled}"
+                        )
+                        # 把本次工具调用与失败结果写入对话历史，避免模型/用户误以为没调用过而重试（#3566）
+                        failed_tool_call_id = (
+                            str(uuid.uuid4())
+                            if tool_call_data["id"] is None
+                            else tool_call_data["id"]
+                        )
+                        self.dialogue.put(
+                            Message(
+                                role="assistant",
+                                tool_calls=[
+                                    {
+                                        "id": failed_tool_call_id,
+                                        "function": {
+                                            "arguments": tool_call_data["arguments"]
+                                            or "{}",
+                                            "name": tool_call_data["name"],
+                                        },
+                                        "type": "function",
+                                        "index": 0,
+                                    }
+                                ],
+                            )
+                        )
+                        self.dialogue.put(
+                            Message(
+                                role="tool",
+                                tool_call_id=failed_tool_call_id,
+                                content=f"工具调用超时（{tool_call_timeout}秒）或异常，后台任务已取消：{e}",
+                            )
                         )
                         # 超时时返回错误响应，避免整个流程卡死
                         tool_results.append((

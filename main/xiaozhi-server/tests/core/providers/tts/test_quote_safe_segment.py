@@ -118,3 +118,24 @@ def test_apostrophes_do_not_block_splitting():
 
 def test_first_sentence_still_splits_at_comma():
     assert _segments("そっか、実習で疲れたんだね。", 1, first_sentence=True)[0] == "そっか"
+
+# ---- issue #3553：数字中的逗号/全角冒号不是句末断句 ----
+
+@pytest.mark.parametrize("step", [1, 4])
+def test_ascii_comma_inside_number_is_not_boundary(step):
+    assert _segments("一共1,280元，请查收。", step, True) == ["一共1,280元", "请查收"]
+
+
+@pytest.mark.parametrize("step", [1, 4])
+def test_fullwidth_comma_inside_number_is_not_boundary(step):
+    assert _segments("一共1，280元，请查收。", step, True) == ["一共1，280元", "请查收"]
+
+
+@pytest.mark.parametrize("step", [1, 4])
+def test_fullwidth_colon_between_digits_is_not_boundary(step):
+    assert _segments("现在是15：30。请出门。", step, True) == ["现在是15：30", "请出门"]
+
+
+@pytest.mark.parametrize("step", [1, 4])
+def test_regular_comma_still_finishes_first_sentence(step):
+    assert _segments("普通的句子，然后结束。", step, True) == ["普通的句子", "然后结束"]
