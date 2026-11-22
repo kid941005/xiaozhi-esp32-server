@@ -186,6 +186,33 @@ OTA接口地址: https://2662r3426b.vicp.fun/xiaozhi/ota/
 Websocket接口地址: wss://2662r3426b.vicp.fun/xiaozhi/v1/
 ```
 
+#### 🐳 本仓库预构建镜像
+
+本 fork 提供已构建好的服务端镜像（含安全加固、上下文源并发化、工具调用治理与测试工程化，详见 [v0.9.9 Release](https://github.com/kid941005/xiaozhi-esp32-server/releases/tag/v0.9.9)）：
+
+| 镜像地址 | 说明 |
+|---|---|
+| `ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.9` | 固定版本，建议用于生产部署与回滚 |
+| `ghcr.io/kid941005/xiaozhi-esp32-server:latest` | 跟随最近一次发布，当前等同 `v0.9.9` |
+
+镜像 digest：`sha256:aa1772e3ef55526b23acdb555dc45cc50b6d978b2ad8b154fcf3f6f648ab8ff3`（linux/amd64，10.8 GB）
+
+拉取与使用：
+
+```bash
+docker pull ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.9
+```
+
+在 `docker-compose.yml` 中把 server 服务的 `image` 换成上述地址即可，例如：
+
+```yaml
+services:
+  xiaozhi-esp32-server:
+    image: ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.9
+```
+
+> 若拉取报 `unauthorized` / `denied`，说明该镜像包仍是 private：先 `docker login ghcr.io -u <你的GitHub用户名>`，或在 GitHub 包设置 Package settings → Change visibility 改为 Public。
+
 #### 🚩 配置说明和推荐
 > [!Note]
 > 本项目提供两种配置方案：
