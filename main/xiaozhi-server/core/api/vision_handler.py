@@ -27,14 +27,20 @@ class VisionHandler(BaseHandler):
         """创建统一的错误响应格式"""
         return {"success": False, "message": message}
 
+    def _test_client_enabled(self) -> bool:
+        """是否允许 web_test_client 跳过认证（默认关闭）"""
+        return bool(
+            self.config.get("server", {}).get("enable_web_test_client", False)
+        )
+
     def _verify_auth_token(self, request) -> Tuple[bool, Optional[str]]:
         """验证认证token"""
-        # 测试模式：允许特定测试令牌或跳过验证
         auth_header = request.headers.get("Authorization", "")
         client_id = request.headers.get("Client-Id", "")
 
-        # 允许测试客户端跳过认证
-        if client_id == "web_test_client":
+        # 测试客户端（数字人）跳过认证属于调试能力，必须显式开启，
+        # 否则任何人都可以用 Client-Id: web_test_client 绕过认证。
+        if client_id == "web_test_client" and self._test_client_enabled():
             device_id = request.headers.get("Device-Id", "test_device")
             return True, device_id
 

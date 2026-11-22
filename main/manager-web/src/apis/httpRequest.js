@@ -126,16 +126,32 @@ function sendRequest() {
 
             const doSend = () => {
                 if (isNotNull(store.getters.getToken)) {
-                    this._header.Authorization = 'Bearer ' + (JSON.parse(store.getters.getToken)).token
+                    try {
+                        const tokenInfo = JSON.parse(store.getters.getToken)
+                        if (tokenInfo && tokenInfo.token) {
+                            this._header.Authorization = 'Bearer ' + tokenInfo.token
+                        }
+                    } catch (e) {
+                        // token 已损坏：清理登录态并回登录页，避免带着非法 token 继续请求
+                        store.commit('clearAuth')
+                        goToPage(Constant.PAGE.LOGIN, true)
+                        return
+                    }
                 }
 
                 // 打印请求信息
+                // 只有幂等请求才允许上层在网络错误时自动重试；
+                // 非幂等写操作（POST/PUT/DELETE/PATCH）网络超时后重发可能造成重复提交
+                const method = (this._method || 'GET').toUpperCase()
+                const idempotent = ['GET', 'HEAD', 'OPTIONS'].includes(method)
+                const networkFailCallback = idempotent ? this._networkFailCallback : null
+
                 fly.request(this._url, this._data, {
                     method: this._method,
                     headers: this._header,
                     responseType: this._responseType
                 }).then((res) => {
-                    const error = httpHandlerError(res, this._failCallback, this._networkFailCallback);
+                    const error = httpHandlerError(res, this._failCallback, networkFailCallback);
                     if (error) {
                         return
                     }
@@ -146,7 +162,7 @@ function sendRequest() {
                 }).catch((res) => {
                     // 打印失败响应
                     console.log('catch', res)
-                    httpHandlerError(res, this._failCallback, this._networkFailCallback)
+                    httpHandlerError(res, this._failCallback, networkFailCallback)
                 })
             }
 
@@ -215,26 +231,56 @@ function sendRequest() {
 function httpHandlerError(info, failCallback, networkFailCallback) {
 
     /** 请求成功，退出该函数 可以根据项目需求来判断是否请求成功。这里判断的是status为200的时候是成功 */
-    let networkError = false
     if (info.status === 200) {
-        if (info.data.code === 'success' || info.data.code === 0 || info.data.code === undefined) {
-            return networkError
-        } else if (info.data.code === 401) {
+        const data = info.data
+        // 文件下载（blob/arraybuffer）没有业务 code，直接视为成功
+        const isBinary = (typeof Blob !== 'undefined' && data instanceof Blob) ||
+            (typeof ArrayBuffer !== 'undefined' && data instanceof ArrayBuffer)
+        const code = data && typeof data === 'object' ? data.code : undefined
+        if (isBinary || code === 'success' || code === 0) {
+            return false
+        }
+        if (code === 401) {
             store.commit('clearAuth');
             goToPage(Constant.PAGE.LOGIN, true);
             return true
-        } else {
-            // 直接使用后端返回的国际化消息
-            let errorMessage = info.data.msg;
-            
-            if (failCallback) {
-                failCallback(info)
-            } else {
-                showDanger(errorMessage)
-            }
-            return true
         }
+        // 业务失败：交给 failCallback 或统一提示，不做网络重试
+        const errorMessage = (data && data.msg) || '请求处理失败'
+        if (failCallback) {
+            failCallback(info)
+        } else {
+            showDanger(errorMessage)
+        }
+        return true
     }
+
+    // HTTP 401/403：登录态失效或权限不足，不能当作网络错误重试
+    if (info.status === 401) {
+        store.commit('clearAuth');
+        goToPage(Constant.PAGE.LOGIN, true);
+        return true
+    }
+    if (info.status === 403) {
+        const msg = (info.data && info.data.msg) || '没有权限执行该操作'
+        if (failCallback) {
+            failCallback(info)
+        } else {
+            showDanger(msg)
+        }
+        return true
+    }
+    // 其余 HTTP 错误（4xx/5xx）属于服务端业务错误，同样不触发网络重试，避免写操作被重复提交
+    if (info.status >= 400) {
+        const msg = (info.data && info.data.msg) || `请求失败【${info.status}】`
+        if (failCallback) {
+            failCallback(info)
+        } else {
+            showDanger(msg)
+        }
+        return true
+    }
+    // status 为 0/undefined 才是真正的网络错误（超时、断网、CORS 等）
     if (networkFailCallback) {
         networkFailCallback(info)
     } else {

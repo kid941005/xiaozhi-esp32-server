@@ -1,5 +1,7 @@
 package xiaozhi.modules.config.init;
 
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
@@ -33,8 +35,10 @@ public class SystemInitConfig {
         // 检查版本号
         String redisVersion = (String) redisUtils.get(RedisKeys.getVersionKey());
         if (!Constant.VERSION.equals(redisVersion)) {
-            // 如果版本不一致，清空Redis
-            redisUtils.emptyAll();
+            // 版本不一致时只清理本应用的缓存前缀，禁止 FLUSHALL 误删共享 Redis 中其他应用的数据
+            redisUtils.deleteByPrefixes(List.of(
+                    "sys:", "model:", "timbre:", "agent:", "device:", "ota:",
+                    "sms:", "knowledge:", "voiceClone:", "tmp_register_mac:", "server:"));
             // 存储新版本号
             redisUtils.set(RedisKeys.getVersionKey(), Constant.VERSION);
         }

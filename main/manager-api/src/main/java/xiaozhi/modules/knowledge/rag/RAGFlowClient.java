@@ -71,12 +71,13 @@ public class RAGFlowClient {
             log.warn("无法从 SpringContext 获取池化 RestTemplate，将退化为简单连接模式: {}", e.getMessage());
         }
 
-        if (false) { // Force new RestTemplate for debugging
+        if (pooledTemplate != null) {
+            // 复用全局池化 RestTemplate，避免每次请求新建连接
             this.restTemplate = pooledTemplate;
             log.debug("RAGFlowClient 已成功挂载全局池化 RestTemplate");
         } else {
             // 兜底方案：配置超时并创建简单 RestTemplate
-            log.info("RAGFlowClient 初始化: 使用独立 RestTemplate (Debug Mode)");
+            log.warn("RAGFlowClient 初始化: 未获取到池化 RestTemplate，退化为独立连接模式");
             SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
             factory.setConnectTimeout(timeoutSeconds * 1000);
             factory.setReadTimeout(timeoutSeconds * 1000);

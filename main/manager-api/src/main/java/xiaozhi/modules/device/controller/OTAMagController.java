@@ -166,9 +166,16 @@ public class OTAMagController {
             // 获取固件信息
             OtaEntity otaEntity = null;
             if (id.indexOf("file:") == 0) {
-                id = id.substring(5);
+                // 资源固件路径只能位于 uploadfile 目录内，避免越权读取任意文件
+                String assetPath = id.substring(5);
+                Path uploadRoot = Paths.get("uploadfile").toAbsolutePath().normalize();
+                Path resolved = uploadRoot.resolve(assetPath).normalize();
+                if (!resolved.startsWith(uploadRoot)) {
+                    logger.warn("Rejected asset path outside upload dir: {}", assetPath);
+                    return ResponseEntity.notFound().build();
+                }
                 otaEntity = new OtaEntity();
-                otaEntity.setFirmwarePath(id);
+                otaEntity.setFirmwarePath(resolved.toString());
                 otaEntity.setType("assets");
                 otaEntity.setVersion("1.0.0");
             } else {

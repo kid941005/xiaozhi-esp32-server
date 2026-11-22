@@ -2,7 +2,9 @@ package xiaozhi.common.redis;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -153,8 +155,30 @@ public class RedisUtils {
 
 
     /**
-     * 清空所有 Redis 数据库中的所有键
+     * 按前缀批量删除本应用的缓存键。
+     * <p>
+     * 用于版本升级时清理过期缓存，避免使用 FLUSHALL 误删同一 Redis 实例中其他应用的键。
+     * 仅在启动升级时调用，keys 命令在该场景下可接受。
      */
+    public void deleteByPrefixes(Collection<String> prefixes) {
+        Set<String> keys = new HashSet<>();
+        for (String prefix : prefixes) {
+            Set<String> matched = redisTemplate.keys(prefix + "*");
+            if (matched != null) {
+                keys.addAll(matched);
+            }
+        }
+        if (!keys.isEmpty()) {
+            redisTemplate.delete(keys);
+        }
+    }
+
+    /**
+     * 清空所有 Redis 数据库中的所有键
+     *
+     * @deprecated 会误删同一 Redis 实例中其他应用的数据，请使用 {@link #deleteByPrefixes(Collection)}
+     */
+    @Deprecated
     public void emptyAll() {
         // Lua 脚本 FLUSHALL是redis清空所有库的命令
         String luaScript =resourceUtils.loadString("lua/emptyAll.lua");

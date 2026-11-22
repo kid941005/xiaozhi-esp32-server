@@ -21,6 +21,17 @@ def _safe_basename(filename: str) -> str:
     return os.path.basename(filename)
 
 
+_SENSITIVE_HEADERS = {"authorization", "cookie", "set-cookie", "x-api-key", "token"}
+
+
+def _redact_headers(headers) -> Dict[str, str]:
+    """脱敏请求头，避免把 Authorization/token 写进日志"""
+    return {
+        key: ("***" if key.lower() in _SENSITIVE_HEADERS else value)
+        for key, value in headers.items()
+    }
+
+
 def _parse_version(ver: str) -> Tuple[int, ...]:
     # conservative parser: split by non-digit, keep numeric parts
     parts = re.findall(r"\d+", ver)
@@ -152,7 +163,9 @@ class OTAHandler(BaseHandler):
         try:
             data = await request.text()
             self.logger.bind(tag=TAG).debug(f"OTA请求方法: {request.method}")
-            self.logger.bind(tag=TAG).debug(f"OTA请求头: {request.headers}")
+            self.logger.bind(tag=TAG).debug(
+                f"OTA请求头: {_redact_headers(request.headers)}"
+            )
             self.logger.bind(tag=TAG).debug(f"OTA请求数据: {data}")
 
             device_id = request.headers.get("device-id", "")

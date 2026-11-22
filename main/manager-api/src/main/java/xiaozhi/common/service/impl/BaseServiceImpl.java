@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
+import java.util.regex.Pattern;
 
 import org.apache.ibatis.binding.MapperMethod;
 import org.apache.ibatis.logging.Log;
@@ -37,6 +38,11 @@ import xiaozhi.common.utils.ConvertUtils;
  * Website: https://www.renren.io
  */
 public abstract class BaseServiceImpl<M extends BaseMapper<T>, T> implements BaseService<T> {
+    /**
+     * 允许的排序字段名：仅字母、数字、下划线，且不能以数字开头。
+     * 防止 ORDER BY 拼接注入（字段名无法使用预编译参数）。
+     */
+    private static final Pattern ORDER_FIELD_PATTERN = Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*$");
     @Autowired
     protected M baseDao;
     protected Log log = LogFactory.getLog(getClass());
@@ -78,11 +84,11 @@ public abstract class BaseServiceImpl<M extends BaseMapper<T>, T> implements Bas
 
         List<String> orderFields = new ArrayList<>();
 
-        // 处理排序字段
-        if (orderField instanceof String) {
-            orderFields.add((String) orderField);
+        // 处理排序字段（只接受合法列名，非法字段直接忽略）
+        if (orderField instanceof String field) {
+            addOrderFieldIfValid(orderFields, field);
         } else if (orderField instanceof List<?> fields) {
-            fields.forEach(field -> orderFields.add(String.class.cast(field)));
+            fields.forEach(field -> addOrderFieldIfValid(orderFields, String.class.cast(field)));
         }
 
         // 有排序字段则排序
@@ -104,6 +110,12 @@ public abstract class BaseServiceImpl<M extends BaseMapper<T>, T> implements Bas
         }
 
         return page;
+    }
+
+    private static void addOrderFieldIfValid(List<String> orderFields, String field) {
+        if (StringUtils.isNotBlank(field) && ORDER_FIELD_PATTERN.matcher(field.trim()).matches()) {
+            orderFields.add(field.trim());
+        }
     }
 
     protected <D> PageData<D> getPageData(List<?> list, long total, Class<D> target) {

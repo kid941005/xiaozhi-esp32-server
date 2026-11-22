@@ -260,9 +260,10 @@ public class SysParamsServiceImpl extends BaseServiceImpl<SysParamsDao, SysParam
         list.add(Constant.SysMSMParam.ALIYUN_SMS_SIGN_NAME.getValue());
         list.add(Constant.SysMSMParam.ALIYUN_SMS_SMS_CODE_TEMPLATE_CODE.getValue());
         StringBuilder str = new StringBuilder();
-        list.forEach(item -> {
-            if (!StringUtils.isNoneBlank(item)) {
-                str.append(",").append(item);
+        list.forEach(code -> {
+            // 这里必须校验参数对应的值，而不是参数编码本身
+            if (StringUtils.isBlank(getValue(code, false))) {
+                str.append(",").append(code);
             }
         });
         if (!str.isEmpty()) {
