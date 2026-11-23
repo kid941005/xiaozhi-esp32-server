@@ -4,6 +4,7 @@ import hmac
 import time
 import hashlib
 import base64
+import asyncio
 import requests
 
 from urllib import parse
@@ -173,7 +174,7 @@ class TTSProvider(TTSProviderBase):
     async def text_to_speak(self, text, output_file):
         if self._is_token_expired():
             logger.warning("Token已过期，正在自动刷新...")
-            self._refresh_token()
+            await asyncio.to_thread(self._refresh_token)
         request_json = {
             "appkey": self.appkey,
             "token": self.token,
@@ -188,15 +189,17 @@ class TTSProvider(TTSProviderBase):
 
         # print(self.api_url, json.dumps(request_json, ensure_ascii=False))
         try:
-            resp = requests.post(
+            resp = await asyncio.to_thread(
+                requests.post,
                 self.api_url,
                 json.dumps(request_json),
                 headers=self.header,
                 timeout=self.tts_timeout,
             )
             if resp.status_code == 401:  # Token过期特殊处理
-                self._refresh_token()
-                resp = requests.post(
+                await asyncio.to_thread(self._refresh_token)
+                resp = await asyncio.to_thread(
+                    requests.post,
                     self.api_url,
                     json.dumps(request_json),
                     headers=self.header,

@@ -1,3 +1,4 @@
+import asyncio
 import requests
 from config.logger import setup_logging
 from core.providers.tts.base import TTSProviderBase
@@ -90,8 +91,8 @@ class TTSProvider(TTSProviderBase):
             "repetition_penalty": self.repetition_penalty,
         }
 
-        resp = requests.post(
-            self.url, json=request_json, timeout=self.tts_timeout
+        resp = await asyncio.to_thread(
+            requests.post, self.url, json=request_json, timeout=self.tts_timeout
         )
         if resp.status_code == 200:
             if output_file:

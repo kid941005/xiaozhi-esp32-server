@@ -1,3 +1,4 @@
+import asyncio
 import requests
 from config.logger import setup_logging
 from core.providers.tts.base import TTSProviderBase
@@ -51,8 +52,8 @@ class TTSProvider(TTSProviderBase):
             "if_sr": self.if_sr,
         }
 
-        resp = requests.get(
-            self.url, params=request_params, timeout=self.tts_timeout
+        resp = await asyncio.to_thread(
+            requests.get, self.url, params=request_params, timeout=self.tts_timeout
         )
         if resp.status_code == 200:
             if output_file:

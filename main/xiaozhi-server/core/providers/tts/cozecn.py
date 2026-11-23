@@ -1,3 +1,4 @@
+import asyncio
 import requests
 from core.providers.tts.base import TTSProviderBase
 
@@ -46,7 +47,8 @@ class TTSProvider(TTSProviderBase):
         }
 
         try:
-            response = requests.request(
+            response = await asyncio.to_thread(
+                requests.request,
                 "POST",
                 self.api_url,
                 json=request_json,

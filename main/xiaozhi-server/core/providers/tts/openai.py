@@ -1,3 +1,4 @@
+import asyncio
 import requests
 from core.utils.util import check_model_key
 from core.providers.tts.base import TTSProviderBase
@@ -47,8 +48,8 @@ class TTSProvider(TTSProviderBase):
             "response_format": self.audio_file_type,
             "speed": self.speed,
         }
-        response = requests.post(
-            self.api_url, json=data, headers=headers, timeout=self.tts_timeout
+        response = await asyncio.to_thread(
+            requests.post, self.api_url, json=data, headers=headers, timeout=self.tts_timeout
         )
         if response.status_code == 200:
             if output_file:

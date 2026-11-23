@@ -5,6 +5,7 @@ from typing import Optional, Tuple, List
 from core.providers.asr.dto.dto import InterfaceType
 from core.providers.asr.base import ASRProviderBase
 
+import asyncio
 import requests
 
 TAG = __name__
@@ -48,7 +49,8 @@ class ASRProvider(ASRProviderBase):
                 }
 
                 start_time = time.time()
-                response = requests.post(
+                response = await asyncio.to_thread(
+                    requests.post,
                     self.api_url,
                     files=files,
                     data=data,

@@ -1,4 +1,5 @@
 import base64
+import asyncio
 import requests
 import ormsgpack
 from pathlib import Path
@@ -160,7 +161,8 @@ class TTSProvider(TTSProviderBase):
 
         pydantic_data = ServeTTSRequest(**data)
 
-        response = requests.post(
+        response = await asyncio.to_thread(
+            requests.post,
             self.api_url,
             data=ormsgpack.packb(
                 pydantic_data, option=ormsgpack.OPT_SERIALIZE_PYDANTIC

@@ -1,6 +1,7 @@
 import uuid
 import json
 import base64
+import asyncio
 import requests
 
 from config.logger import setup_logging
@@ -79,7 +80,8 @@ class TTSProvider(TTSProviderBase):
         }
 
         try:
-            resp = requests.post(
+            resp = await asyncio.to_thread(
+                requests.post,
                 self.api_url,
                 json.dumps(request_json),
                 headers=self.header,

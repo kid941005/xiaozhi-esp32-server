@@ -60,7 +60,7 @@ def clear_local_cache():
 
 def create_instance(class_name: str, *args, **kwargs) -> ASRProviderBase:
     """工厂方法创建ASR实例"""
-    if os.path.exists(os.path.join('core', 'providers', 'asr', f'{class_name}.py')):
+    if os.path.exists(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'providers', 'asr', f'{class_name}.py')):
         lib_name = f'core.providers.asr.{class_name}'
         if lib_name not in sys.modules:
             sys.modules[lib_name] = importlib.import_module(f'{lib_name}')

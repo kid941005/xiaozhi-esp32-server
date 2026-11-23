@@ -4,6 +4,7 @@ import time
 import uuid
 import json
 import base64
+import asyncio
 import requests
 from datetime import datetime, timezone
 from core.providers.tts.base import TTSProviderBase
@@ -153,7 +154,8 @@ class TTSProvider(TTSProviderBase):
             headers = self._get_auth_headers(request_json)
 
             # 发送请求
-            resp = requests.post(
+            resp = await asyncio.to_thread(
+                requests.post,
                 self.api_url,
                 json.dumps(request_json),
                 headers=headers,

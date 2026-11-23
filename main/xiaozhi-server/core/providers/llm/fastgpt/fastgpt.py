@@ -22,6 +22,9 @@ class LLMProvider(LLMProviderBase):
         # 取最后一条用户消息
         last_msg = next(m for m in reversed(dialogue) if m["role"] == "user")
 
+        # 标记当前是否处于 <think> 推理段内（原来按 chunk 是否含标签直接丢弃，会连正文一起丢）
+        in_think = False
+
         # 发起流式请求
         with requests.post(
             f"{self.base_url}/chat/completions",
@@ -51,11 +54,22 @@ class LLMProvider(LLMProviderBase):
                                     and delta["content"] is not None
                                 ):
                                     content = delta["content"]
+                                    # 只剥离 <think> 推理段标签，不要把整块正文一起丢掉
+                                    if in_think:
+                                        if "</think>" in content:
+                                            content = content.split("</think>", 1)[1]
+                                            in_think = False
+                                        else:
+                                            continue
                                     if "<think>" in content:
-                                        continue
-                                    if "</think>" in content:
-                                        continue
-                                    yield content
+                                        head, _, tail = content.partition("<think>")
+                                        content = head
+                                        if "</think>" in tail:
+                                            content = tail.split("</think>", 1)[1]
+                                        else:
+                                            in_think = True
+                                    if content:
+                                        yield content
 
                     except json.JSONDecodeError as e:
                         continue
@@ -63,6 +77,9 @@ class LLMProvider(LLMProviderBase):
                         continue
 
     def response_with_functions(self, session_id, dialogue, functions=None):
-        logger.bind(tag=TAG).error(
-            f"fastgpt暂未实现完整的工具调用（function call），建议使用其他意图识别"
+        # 原来只打日志并返回 None，调用方按生成器迭代会抛 TypeError。
+        # 这里降级为普通对话生成（忽略 functions），保证链路可用。
+        logger.bind(tag=TAG).warning(
+            "fastgpt暂未实现完整的工具调用（function call），已降级为普通对话生成"
         )
+        yield from self.response(session_id, dialogue, functions=functions)

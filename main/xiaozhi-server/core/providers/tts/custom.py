@@ -1,6 +1,7 @@
 import os
 import json
 import uuid
+import asyncio
 import requests
 from config.logger import setup_logging
 from datetime import datetime
@@ -38,14 +39,16 @@ class TTSProvider(TTSProviderBase):
             request_params[k] = v
 
         if self.method.upper() == "POST":
-            resp = requests.post(
+            resp = await asyncio.to_thread(
+                requests.post,
                 self.url,
                 json=request_params,
                 headers=self.headers,
                 timeout=self.tts_timeout,
             )
         else:
-            resp = requests.get(
+            resp = await asyncio.to_thread(
+                requests.get,
                 self.url,
                 params=request_params,
                 headers=self.headers,
