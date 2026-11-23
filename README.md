@@ -188,6 +188,8 @@ Websocket接口地址: wss://2662r3426b.vicp.fun/xiaozhi/v1/
 
 #### 🐳 本仓库预构建镜像
 
+<!-- IMAGES:BEGIN -->
+
 本 fork 提供已构建好的服务端镜像（含安全加固、上下文源并发化、工具调用治理与测试工程化，详见 [v0.9.9 Release](https://github.com/kid941005/xiaozhi-esp32-server/releases/tag/v0.9.9)）：
 
 | 镜像地址 | 说明 |
@@ -222,7 +224,9 @@ services:
 
 > Docker Hub 与 GHCR 上的镜像均为 **public**，可直接拉取、无需登录。若 GHCR 仍报 `unauthorized` / `denied`，多半是本地缓存了旧的私有凭据：先 `docker logout ghcr.io` 再重试。
 
-> 镜像由 GitHub Actions 流水线 [`.github/workflows/dockerhub-image.yml`](.github/workflows/dockerhub-image.yml) 构建：推送 `v*.*.*` 标签或手动触发时，会同步发布到 Docker Hub。
+> 镜像由 GitHub Actions 流水线 [`.github/workflows/dockerhub-image.yml`](.github/workflows/dockerhub-image.yml) 构建：推送 `v*.*.*` 标签或手动触发时，一次构建同时发布到 GHCR 与 Docker Hub（同一组标签）。
+
+<!-- IMAGES:END -->
 
 #### 🚩 配置说明和推荐
 > [!Note]

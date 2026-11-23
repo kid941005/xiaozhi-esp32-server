@@ -1,16 +1,18 @@
-name: Publish Docker Hub Image
+name: Publish Images (GHCR + Docker Hub)
 
-# 用 GitHub Actions 构建 xiaozhi-server 镜像并同步推送到 Docker Hub。
-# 需要仓库 Secrets：DOCKERHUB_USERNAME、DOCKERHUB_TOKEN（Docker Hub 账号 + Access Token，需 Read/Write 权限）。
-# 缺失 Secrets 时仅构建不推送，便于先验证流水线。
+# 一次构建同时推送到 GHCR 与 Docker Hub（双镜像、同一组标签，linux/amd64）。
+# GHCR 使用内置 GITHUB_TOKEN（需要 packages: write），无需额外 Secrets。
+# Docker Hub 需要仓库 Secrets：DOCKERHUB_USERNAME、DOCKERHUB_TOKEN（账号 + Access Token，Read/Write）；
+# 缺失时只推 GHCR，流水线不失败。
+# 发布后执行 scripts/release/update_image_docs.sh <version> 同步 README 与 Release 说明。
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: '镜像版本标签，例如 v0.9.9'
+        description: '镜像版本标签，例如 v0.9.10'
         required: true
-        default: 'v0.9.9'
+        default: 'v0.9.10'
       push_latest:
         description: '同时推送 latest 标签'
         type: boolean
@@ -20,16 +22,16 @@ on:
       - 'v*.*.*'
 
 concurrency:
-  group: dockerhub-${{ github.ref }}
+  group: images-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  dockerhub:
-    name: Build and push server image to Docker Hub
+  publish:
+    name: Build and push server image (GHCR + Docker Hub)
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: read
+      packages: write
     env:
       DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
       DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -49,7 +51,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to GitHub Container Registry (拉取基座镜像)
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -66,7 +68,7 @@ jobs:
 
       - name: Warn when Docker Hub secrets are missing
         if: env.DH_USER == '' || env.DH_TOKEN == ''
-        run: echo "::warning::未配置 DOCKERHUB_USERNAME / DOCKERHUB_TOKEN，本次仅构建不推送。"
+        run: echo "::warning::未配置 DOCKERHUB_USERNAME / DOCKERHUB_TOKEN，本次只推送 GHCR。"
 
       - name: Resolve version
         id: v
@@ -84,15 +86,19 @@ jobs:
       - name: Compose image tags
         id: tags
         run: |
-          REPO="${DH_USER:-local}/xiaozhi-esp32-server"
           VER="${{ steps.v.outputs.version }}"
-          TAGS="$REPO:$VER"
+          GHCR_REPO="ghcr.io/${{ github.repository_owner }}/xiaozhi-esp32-server"
+          TAGS="$GHCR_REPO:$VER"
+          if [ -n "$DH_USER" ]; then TAGS="$TAGS"$'\n'"$DH_USER/xiaozhi-esp32-server:$VER"; fi
+          PUSH_LATEST=false
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            if [ "${{ inputs.push_latest }}" = "true" ] && [ "$VER" != "latest" ]; then
-              TAGS="$TAGS"$'\n'"$REPO:latest"
-            fi
+            if [ "${{ inputs.push_latest }}" = "true" ] && [ "$VER" != "latest" ]; then PUSH_LATEST=true; fi
           elif [ "$VER" != "latest" ]; then
-            TAGS="$TAGS"$'\n'"$REPO:latest"
+            PUSH_LATEST=true
+          fi
+          if [ "$PUSH_LATEST" = "true" ]; then
+            TAGS="$TAGS"$'\n'"$GHCR_REPO:latest"
+            if [ -n "$DH_USER" ]; then TAGS="$TAGS"$'\n'"$DH_USER/xiaozhi-esp32-server:latest"; fi
           fi
           {
             echo "list<<EOF"
@@ -107,7 +113,7 @@ jobs:
           context: .
           file: Dockerfile-server
           platforms: linux/amd64
-          push: ${{ env.DH_USER != '' && env.DH_TOKEN != '' }}
+          push: true
           tags: ${{ steps.tags.outputs.list }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -115,8 +121,20 @@ jobs:
             BUILDKIT_PROGRESS=plain
 
       - name: Output image info
-        if: env.DH_USER != '' && env.DH_TOKEN != ''
         run: |
-          REPO="${{ env.DH_USER }}/xiaozhi-esp32-server"
-          echo "✅ 已推送：$REPO:${{ steps.v.outputs.version }}"
-          docker buildx imagetools inspect "$REPO:${{ steps.v.outputs.version }}" || true
+          VER="${{ steps.v.outputs.version }}"
+          GHCR_REPO="ghcr.io/${{ github.repository_owner }}/xiaozhi-esp32-server"
+          echo "已推送 GHCR：$GHCR_REPO:$VER"
+          docker buildx imagetools inspect "$GHCR_REPO:$VER" || true
+          if [ -n "$DH_USER" ]; then
+            echo "已推送 Docker Hub：$DH_USER/xiaozhi-esp32-server:$VER"
+            docker buildx imagetools inspect "$DH_USER/xiaozhi-esp32-server:$VER" || true
+          fi
+          {
+            echo "### 镜像已发布"
+            echo ""
+            echo "- GHCR: $GHCR_REPO:$VER"
+            if [ -n "$DH_USER" ]; then echo "- Docker Hub: $DH_USER/xiaozhi-esp32-server:$VER"; fi
+            echo ""
+            echo "下一步：在仓库根执行 bash scripts/release/update_image_docs.sh $VER 同步 README 与 Release 说明。"
+          } >> "$GITHUB_STEP_SUMMARY"
