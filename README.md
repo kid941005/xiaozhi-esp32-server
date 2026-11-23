@@ -316,7 +316,7 @@ services:
 
 | 使用方式 | 支持平台 | 免费平台 |
 |:---:|:---:|:---:|
-| OpenAI 接口调用 | 阿里百炼、智谱ChatGLMVLLM | 智谱ChatGLMVLLM |
+| OpenAI 接口调用 | 阿里百炼、智谱ChatGLMVLLM、科大讯飞 | 智谱ChatGLMVLLM |
 
 实际上，任何支持 OpenAI 接口调用的 VLLM 均可接入使用。
 
@@ -366,6 +366,7 @@ services:
 | Memory |     [powermem](./docs/powermem-integration.md)    | 本地总结 | 取决于LLM和DB |  OceanBase开源，支持智能检索  |
 | Memory | mem_local_short | 本地总结 |    免费     |    |
 | Memory |     nomem       | 无记忆模式 |    免费     |    |
+| Memory | mem_report_only | 仅上报 |    免费     | 只上报聊天记录，不做记忆总结 |
 
 ---
 

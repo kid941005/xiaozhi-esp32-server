@@ -151,9 +151,9 @@ class ToolManager:
         return {name: dict(stats) for name, stats in self._call_stats.items()}
 
     async def execute_tool(
-        self, tool_name: str, arguments: Dict[str, Any]
+        self, tool_name: str, arguments: Dict[str, Any], speaker=None
     ) -> ActionResponse:
-        """执行工具调用"""
+        """执行工具调用。speaker: 本轮说话人快照。"""
         started = time.monotonic()
         failed = False
         try:
@@ -177,7 +177,7 @@ class ToolManager:
 
             # 执行工具
             self.logger.info(f"执行工具: {tool_name}，参数: {arguments}")
-            result = await executor.execute(self.conn, tool_name, arguments)
+            result = await executor.execute(self.conn, tool_name, arguments, speaker=speaker)
             self.logger.debug(f"工具执行结果: {result}")
             if result is not None and result.action in (Action.ERROR, Action.NOTFOUND):
                 failed = True
