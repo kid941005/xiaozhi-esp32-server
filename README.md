@@ -194,8 +194,8 @@ Websocket接口地址: wss://2662r3426b.vicp.fun/xiaozhi/v1/
 |---|---|
 | `kid941005/xiaozhi-esp32-server:v0.9.9` | Docker Hub（public，无需登录），固定版本，建议用于生产部署与回滚 |
 | `kid941005/xiaozhi-esp32-server:latest` | Docker Hub（public），跟随最近一次发布，当前等同 `v0.9.9` |
-| `ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.9` | GHCR，固定版本 |
-| `ghcr.io/kid941005/xiaozhi-esp32-server:latest` | GHCR，跟随最近一次发布，当前等同 `v0.9.9` |
+| `ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.9` | GHCR（public，无需登录），固定版本 |
+| `ghcr.io/kid941005/xiaozhi-esp32-server:latest` | GHCR（public，无需登录），跟随最近一次发布，当前等同 `v0.9.9` |
 
 镜像 digest（同一提交、不同构建环境，内容等价）：
 - Docker Hub：`sha256:98a84129074885fc7ad8ae5b728539153bfe8c496b732e2f0d42dbae23269d7a`（linux/amd64，压缩 3.3 GB / 解压 10.8 GB）
@@ -207,7 +207,7 @@ Websocket接口地址: wss://2662r3426b.vicp.fun/xiaozhi/v1/
 # Docker Hub（public，可直接拉取）
 docker pull kid941005/xiaozhi-esp32-server:v0.9.9
 
-# GHCR
+# GHCR（public，可直接拉取）
 docker pull ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.9
 ```
 
@@ -220,7 +220,7 @@ services:
     # image: ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.9  # GHCR 备用
 ```
 
-> Docker Hub 上的镜像为 public，可直接拉取；若 GHCR 拉取报 `unauthorized` / `denied`，说明该镜像包仍是 private：先 `docker login ghcr.io -u <你的GitHub用户名>`，或在 GitHub 包设置 Package settings → Change visibility 改为 Public。
+> Docker Hub 与 GHCR 上的镜像均为 **public**，可直接拉取、无需登录。若 GHCR 仍报 `unauthorized` / `denied`，多半是本地缓存了旧的私有凭据：先 `docker logout ghcr.io` 再重试。
 
 > 镜像由 GitHub Actions 流水线 [`.github/workflows/dockerhub-image.yml`](.github/workflows/dockerhub-image.yml) 构建：推送 `v*.*.*` 标签或手动触发时，会同步发布到 Docker Hub。
 
