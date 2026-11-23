@@ -190,27 +190,27 @@ Websocket接口地址: wss://2662r3426b.vicp.fun/xiaozhi/v1/
 
 <!-- IMAGES:BEGIN -->
 
-本 fork 提供已构建好的服务端镜像（含安全加固、上下文源并发化、工具调用治理与测试工程化，详见 [v0.9.9 Release](https://github.com/kid941005/xiaozhi-esp32-server/releases/tag/v0.9.9)）：
+本 fork 提供已构建好的服务端镜像（含安全加固、上下文源并发化、工具调用治理与测试工程化，详见 [v0.9.10 Release](https://github.com/kid941005/xiaozhi-esp32-server/releases/tag/v0.9.10)）：
 
 | 镜像地址 | 说明 |
 |---|---|
-| `kid941005/xiaozhi-esp32-server:v0.9.9` | Docker Hub（public，无需登录），固定版本，建议用于生产部署与回滚 |
-| `kid941005/xiaozhi-esp32-server:latest` | Docker Hub（public），跟随最近一次发布，当前等同 `v0.9.9` |
-| `ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.9` | GHCR（public，无需登录），固定版本 |
-| `ghcr.io/kid941005/xiaozhi-esp32-server:latest` | GHCR（public，无需登录），跟随最近一次发布，当前等同 `v0.9.9` |
+| `kid941005/xiaozhi-esp32-server:v0.9.10` | Docker Hub（public，无需登录），固定版本，建议用于生产部署与回滚 |
+| `kid941005/xiaozhi-esp32-server:latest` | Docker Hub（public），跟随最近一次发布，当前等同 `v0.9.10` |
+| `ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.10` | GHCR（public，无需登录），固定版本 |
+| `ghcr.io/kid941005/xiaozhi-esp32-server:latest` | GHCR（public，无需登录），跟随最近一次发布，当前等同 `v0.9.10` |
 
 镜像 digest（同一提交、不同构建环境，内容等价）：
-- Docker Hub：`sha256:98a84129074885fc7ad8ae5b728539153bfe8c496b732e2f0d42dbae23269d7a`（linux/amd64，压缩 3.3 GB / 解压 10.8 GB）
-- GHCR：`sha256:aa1772e3ef55526b23acdb555dc45cc50b6d978b2ad8b154fcf3f6f648ab8ff3`（linux/amd64，10.8 GB）
+- Docker Hub：`sha256:6f35538063cdb8d9828ff610134703452e5da00da56b7ef0b2c72ec2240301d4`（linux/amd64，压缩 3.3 GB / 解压 10.8 GB）
+- GHCR：`sha256:6f35538063cdb8d9828ff610134703452e5da00da56b7ef0b2c72ec2240301d4`（linux/amd64，10.8 GB）
 
 拉取与使用：
 
 ```bash
 # Docker Hub（public，可直接拉取）
-docker pull kid941005/xiaozhi-esp32-server:v0.9.9
+docker pull kid941005/xiaozhi-esp32-server:v0.9.10
 
 # GHCR（public，可直接拉取）
-docker pull ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.9
+docker pull ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.10
 ```
 
 在 `docker-compose.yml` 中把 server 服务的 `image` 换成上述地址即可，例如：
@@ -218,8 +218,8 @@ docker pull ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.9
 ```yaml
 services:
   xiaozhi-esp32-server:
-    image: kid941005/xiaozhi-esp32-server:v0.9.9            # Docker Hub
-    # image: ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.9  # GHCR 备用
+    image: kid941005/xiaozhi-esp32-server:v0.9.10            # Docker Hub
+    # image: ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.10  # GHCR 备用
 ```
 
 > Docker Hub 与 GHCR 上的镜像均为 **public**，可直接拉取、无需登录。若 GHCR 仍报 `unauthorized` / `denied`，多半是本地缓存了旧的私有凭据：先 `docker logout ghcr.io` 再重试。
