@@ -20,7 +20,7 @@ class _Exec:
     def get_tools(self):
         return self._tools
 
-    async def execute(self, conn, tool_name, arguments):
+    async def execute(self, conn, tool_name, arguments, speaker=None):
         self.calls += 1
         if self._raises is not None:
             raise self._raises

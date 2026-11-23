@@ -44,7 +44,7 @@ class _FuncHandler:
         self._behaviour = behaviour
         self.calls = []
 
-    async def handle_llm_function_call(self, conn, tool_call_data):
+    async def handle_llm_function_call(self, conn, tool_call_data, speaker=None):
         self.calls.append(tool_call_data)
         return await self._behaviour(tool_call_data)
 
