@@ -55,8 +55,10 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          # 该包由 PAT 首次创建，未与本仓库绑定，内置 GITHUB_TOKEN 会 write_package 被拒；
+          # 优先用 secrets.TOKEN（PAT，write:packages），缺失时回退 GITHUB_TOKEN。
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Login to Docker Hub
         if: env.DH_USER != '' && env.DH_TOKEN != ''
