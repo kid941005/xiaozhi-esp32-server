@@ -219,13 +219,19 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
         // 检查是否启用认证并生成token
         String authEnabled = sysParamsService.getValue(Constant.SERVER_AUTH_ENABLED, true);
         if ("true".equalsIgnoreCase(authEnabled)) {
-            try {
-                // 生成token
-                String token = generateWebSocketToken(clientId, macAddress);
-                websocket.setToken(token);
-            } catch (Exception e) {
-                log.error("生成WebSocket token失败: {}", e.getMessage());
+            if (deviceById == null) {
+                // 未在智控台登记的设备不签发凭证，避免任意自报 MAC 换取 token（#3456 ③）
+                log.warn("设备未登记，拒绝签发WebSocket token: {}", macAddress);
                 websocket.setToken("");
+            } else {
+                try {
+                    // 生成token
+                    String token = generateWebSocketToken(clientId, macAddress);
+                    websocket.setToken(token);
+                } catch (Exception e) {
+                    log.error("生成WebSocket token失败: {}", e.getMessage());
+                    websocket.setToken("");
+                }
             }
         } else {
             websocket.setToken("");

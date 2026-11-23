@@ -65,6 +65,10 @@ class WebSocketServer:
         self.auth_enable = auth_config.get("enabled", False)
         # 设备白名单
         self.allowed_devices = set(auth_config.get("allowed_devices", []))
+        # 白名单只放宽 token 有效期，不再免 token（#3448）
+        self.allowed_devices_expire_seconds = auth_config.get(
+            "allowed_devices_expire_seconds", None
+        )
         secret_key = self.config["server"]["auth_key"]
         expire_seconds = auth_config.get("expire_seconds", None)
         self.auth = AuthManager(secret_key=secret_key, expire_seconds=expire_seconds)
@@ -255,19 +259,24 @@ class WebSocketServer:
             headers = dict(websocket.request.headers)
             device_id = headers.get("device-id", None)
             client_id = headers.get("client-id", None)
-            if self.allowed_devices and device_id in self.allowed_devices:
-                # 如果属于白名单内的设备，不校验token，直接放行
-                return
+            # 白名单设备也必须携带 token，只放宽有效期（#3448：Device-Id 可伪造，不能免鉴权）
+            is_allowlisted = bool(
+                self.allowed_devices and device_id in self.allowed_devices
+            )
+            token = headers.get("authorization", "")
+            if token.startswith("Bearer "):
+                token = token[7:]  # 移除'Bearer '前缀
             else:
-                # 否则校验token
-                token = headers.get("authorization", "")
-                if token.startswith("Bearer "):
-                    token = token[7:]  # 移除'Bearer '前缀
-                else:
-                    raise AuthenticationError("Missing or invalid Authorization header")
-                # 进行认证
-                auth_success = self.auth.verify_token(
-                    token, client_id=client_id, username=device_id
-                )
-                if not auth_success:
-                    raise AuthenticationError("Invalid token")
+                raise AuthenticationError("Missing or invalid Authorization header")
+            # 进行认证
+            expire_seconds = (
+                self.allowed_devices_expire_seconds if is_allowlisted else None
+            )
+            auth_success = self.auth.verify_token(
+                token,
+                client_id=client_id,
+                username=device_id,
+                expire_seconds=expire_seconds,
+            )
+            if not auth_success:
+                raise AuthenticationError("Invalid token")

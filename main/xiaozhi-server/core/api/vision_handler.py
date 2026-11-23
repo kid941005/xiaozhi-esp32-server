@@ -161,7 +161,7 @@ class VisionHandler(BaseHandler):
             )
         finally:
             if response:
-                self._add_cors_headers(response)
+                self._add_cors_headers(response, request)
             return response
 
     async def handle_get(self, request):
@@ -184,5 +184,5 @@ class VisionHandler(BaseHandler):
                 content_type="application/json",
             )
         finally:
-            self._add_cors_headers(response)
+            self._add_cors_headers(response, request)
             return response

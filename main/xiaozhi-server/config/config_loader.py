@@ -67,7 +67,7 @@ async def get_config_from_api_async(config):
         "url": config["manager-api"].get("url", ""),
         "secret": config["manager-api"].get("secret", ""),
     }
-    auth_enabled = config_data.get("server", {}).get("auth", {}).get("enabled", False)
+    api_auth = dict(config_data.get("server", {}).get("auth") or {})
     # server的配置以本地为准
     if config.get("server"):
         config_data["server"] = {
@@ -76,8 +76,14 @@ async def get_config_from_api_async(config):
             "http_port": config["server"].get("http_port", ""),
             "vision_explain": config["server"].get("vision_explain", ""),
             "auth_key": config["server"].get("auth_key", ""),
+            # 跨域配置只存在于本地（智控台不下发），必须保留，否则 CORS 白名单失效
+            "cors": config["server"].get("cors") or {},
         }
-    config_data["server"]["auth"] = {"enabled": auth_enabled}
+    # 认证段：智控台只决定是否启用，其余键（白名单/严格 OTA/下载鉴权等）以本地为准（#3456）
+    local_auth = dict((config.get("server") or {}).get("auth") or {})
+    merged_auth = dict(local_auth)
+    merged_auth["enabled"] = api_auth.get("enabled", local_auth.get("enabled", False))
+    config_data["server"]["auth"] = merged_auth
     # 如果服务器没有prompt_template，则从本地配置读取
     if not config_data.get("prompt_template"):
         config_data["prompt_template"] = config.get("prompt_template")

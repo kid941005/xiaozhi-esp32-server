@@ -49,19 +49,30 @@ class AuthManager:
         token = f"{signature}.{ts}"
         return token
 
-    def verify_token(self, token: str, client_id: str, username: str) -> bool:
+    def verify_token(
+        self,
+        token: str,
+        client_id: str,
+        username: str,
+        expire_seconds: int = None,
+    ) -> bool:
         """
         验证token有效性
         Args:
             token: 客户端传入的token
             client_id: 连接使用的client_id
             username: 连接使用的username
+            expire_seconds: 可选的过期时间覆盖（秒），用于白名单设备放宽有效期；
+                不传则使用实例默认的 expire_seconds
         """
         try:
             sig_part, ts_str = token.split(".")
             ts = int(ts_str)
-            if int(time.time()) - ts > self.expire_seconds:
+            limit = self.expire_seconds if expire_seconds is None else int(expire_seconds)
+            if int(time.time()) - ts > limit:
                 return False  # 过期
+            if ts > int(time.time()) + 300:
+                return False  # 签发时间在未来（时钟漂移容差 5 分钟），视为非法
 
             expected_sig = self._sign(f"{client_id}|{username}|{ts}")
             if not hmac.compare_digest(sig_part, expected_sig):
