@@ -28,6 +28,7 @@ bash scripts/setup_libopus.sh || echo "[run_tests] 警告：libopus 未就绪，
 
 # 2) 测试配置：config/logger.py 的 setup_logging 会读 data/.config.yaml
 if [ ! -f data/.config.yaml ]; then
+  mkdir -p data   # data/ 是运行时目录，全新 clone 里不存在，先建再写
   printf '{}\n' > data/.config.yaml
   echo "[run_tests] 已创建临时 data/.config.yaml"
 fi
