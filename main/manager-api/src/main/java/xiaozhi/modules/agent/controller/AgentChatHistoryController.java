@@ -88,7 +88,9 @@ public class AgentChatHistoryController {
         // 生成UUID
         String uuid = UUID.randomUUID().toString();
         // 存储agentId和sessionId到Redis，格式为agentId:sessionId
-        redisUtils.set(RedisKeys.getChatHistoryKey(uuid), agentId + ":" + sessionId);
+        // 该 UUID 是匿名下载凭证（/agent/chat-history/download/** 在 Shiro 中为 anon），
+        // 必须带过期时间，避免链接永久有效
+        redisUtils.set(RedisKeys.getChatHistoryKey(uuid), agentId + ":" + sessionId, 600L);
 
         return new Result<String>().ok(uuid);
     }

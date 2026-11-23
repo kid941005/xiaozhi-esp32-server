@@ -1,5 +1,6 @@
 package xiaozhi.modules.device.controller;
 
+import java.security.SecureRandom;
 import java.util.List;
 import java.util.Map;
 
@@ -46,6 +47,12 @@ public class DeviceController {
     private final RedisUtils redisUtils;
     private final SysParamsService sysParamsService;
 
+    /** 设备注册验证码用的密码学安全随机源（Math.random 可预测且可能产生科学计数法字符串） */
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
+    /** 验证码碰撞重试上限，避免极端情况下无限循环 */
+    static final int CAPTCHA_MAX_RETRY = 10;
+
     public DeviceController(DeviceService deviceService, DeviceAddressBookService deviceAddressBookService,
             RedisUtils redisUtils, SysParamsService sysParamsService) {
         this.deviceService = deviceService;
@@ -69,18 +76,30 @@ public class DeviceController {
         if (StringUtils.isBlank(macAddress)) {
             return new Result<String>().error(ErrorCode.MCA_NOT_NULL);
         }
-        // 生成六位验证码
-        String code;
-        String key;
-        String existsMac = null;
-        do {
-            code = String.valueOf(Math.random()).substring(2, 8);
-            key = RedisKeys.getDeviceCaptchaKey(code);
-            existsMac = (String) redisUtils.get(key);
-        } while (StringUtils.isNotBlank(existsMac));
+        String code = allocateDeviceCode(candidateKey -> (String) redisUtils.get(candidateKey));
+        if (code == null) {
+            return new Result<String>().error("验证码生成失败，请稍后重试");
+        }
 
-        redisUtils.set(key, macAddress);
+        redisUtils.set(RedisKeys.getDeviceCaptchaKey(code), macAddress);
         return new Result<String>().ok(code);
+    }
+
+    /**
+     * 生成六位验证码：SecureRandom 生成 000000-999999，固定六位数字，
+     * 不会出现科学计数法截断，也不可预测；最多重试 CAPTCHA_MAX_RETRY 次，
+     * 全部被占用时返回 null。
+     *
+     * @param existingCodeLookup 查询某个候选 key 是否已被占用的函数
+     */
+    String allocateDeviceCode(java.util.function.Function<String, String> existingCodeLookup) {
+        for (int attempt = 0; attempt < CAPTCHA_MAX_RETRY; attempt++) {
+            String candidate = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+            if (StringUtils.isBlank(existingCodeLookup.apply(RedisKeys.getDeviceCaptchaKey(candidate)))) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     @GetMapping("/bind/{agentId}")

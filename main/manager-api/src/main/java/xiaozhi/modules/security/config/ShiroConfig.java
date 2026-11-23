@@ -79,9 +79,8 @@ public class ShiroConfig {
         filterMap.put("/ota/**", "anon");
         filterMap.put("/otaMag/download/**", "anon");
         filterMap.put("/webjars/**", "anon");
-        filterMap.put("/druid/**", "anon");
-        filterMap.put("/v3/api-docs/**", "anon");
-        filterMap.put("/doc.html", "anon");
+        // 数据库监控 / OpenAPI 文档页面不再匿名开放：它们会暴露表结构与全部接口定义，
+        // 由下方 /** -> oauth2 兜底规则要求登录后访问。
         filterMap.put("/favicon.ico", "anon");
         filterMap.put("/user/captcha", "anon");
         filterMap.put("/user/smsVerification", "anon");

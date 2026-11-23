@@ -38,10 +38,9 @@ server:
     allowed_devices: []
     # 白名单设备允许的 token 有效期（秒），不填则与 expire_seconds 一致
     allowed_devices_expire_seconds: 315360000
-    # OTA 签发收紧（#3456）：开启后只有白名单设备、持有有效凭证的设备，或本进程内首次自举的设备
-    # 能换取 token，其他一律 403。注意：固件若在 OTA 请求中不携带 Authorization，开启后可能导致
-    # 设备无法上线，请先用测试设备验证再上生产。
-    strict_ota: false
+    # OTA 签发收紧（#3456）：默认开启，只有白名单设备、持有有效凭证的设备，或本进程内首次自举的设备
+    # 能换取 token，其他一律 403。正常设备仍可上线；如遇老固件无法上线，可临时改为 false 定位问题。
+    strict_ota: true
     # 固件下载鉴权（#3456）：开启后 /xiaozhi/ota/download 需要有效 Bearer token
     protect_firmware_download: false
   # 跨域配置（#3456）：留空表示不下发 Access-Control-Allow-Origin（仅同源可用）；

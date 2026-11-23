@@ -64,6 +64,9 @@ public class ConfigServiceImpl implements ConfigService {
     private final AgentVoicePrintDao agentVoicePrintDao;
     private final CorrectWordFileService correctWordFileService;
 
+    /** 服务器配置快照缓存有效期（秒），避免配置改动后长期读到旧快照 */
+    private static final long SERVER_CONFIG_CACHE_TTL_SECONDS = 300L;
+
     @Override
     public Map<String, Object> getConfig(Boolean isCache) {
         if (isCache) {
@@ -108,8 +111,9 @@ public class ConfigServiceImpl implements ConfigService {
                 result,
                 isCache);
 
-        // 将配置存入Redis
-        redisUtils.set(RedisKeys.getServerConfigKey(), result);
+        // 将配置存入Redis（带 TTL：此前该 key 无过期时间且全仓库无失效点，
+        // 会导致修改配置后 /config/server-base 一直返回旧快照）
+        redisUtils.set(RedisKeys.getServerConfigKey(), result, SERVER_CONFIG_CACHE_TTL_SECONDS);
 
         return result;
     }

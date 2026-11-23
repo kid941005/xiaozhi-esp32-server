@@ -48,6 +48,11 @@ public class KnowledgeFilesController {
         // 获取知识库信息
         KnowledgeBaseDTO knowledgeBase = knowledgeBaseService.getByDatasetId(datasetId);
 
+        // 知识库不存在（或已删除）时同样按无权限处理，避免直接解引用 null 抛 NPE 变成 500
+        if (knowledgeBase == null) {
+            throw new RenException(ErrorCode.NO_PERMISSION);
+        }
+
         // 检查权限：用户只能操作自己创建的知识库
         if (knowledgeBase.getCreator() == null || !knowledgeBase.getCreator().equals(currentUserId)) {
             throw new RenException(ErrorCode.NO_PERMISSION);

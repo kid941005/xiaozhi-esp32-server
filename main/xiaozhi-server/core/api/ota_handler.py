@@ -68,8 +68,9 @@ class OTAHandler(BaseHandler):
         self.allowed_devices_expire_seconds = auth_config.get(
             "allowed_devices_expire_seconds", None
         )
-        # OTA 签发收紧（#3456 ②）：默认关闭，避免固件不带 Authorization 时砖机
-        self.strict_ota = bool(auth_config.get("strict_ota", False))
+        # OTA 签发收紧（#3456 ②）：默认开启。仍保留「白名单设备 / 持有有效凭证 / 进程内首次自举」
+        # 三条放行通道，正常设备仍能上线，只有伪造 Device-Id 的请求会被拒绝
+        self.strict_ota = bool(auth_config.get("strict_ota", True))
         # 严格模式下允许每个设备在进程内首次自举一次，防止设备彻底失联
         self._bootstrapped_devices = set()
         # 固件下载鉴权（#3456 ⑥）：默认关闭，避免设备下载失败
