@@ -44,7 +44,16 @@ class TestRuntimeApplication:
             return
 
         self.setup()
-        self.plugins.start_all()
+        try:
+            self.plugins.start_all()
+        except Exception:
+            # start_all() 内部已回滚已启动的插件；这里再兜一次 stop_all()，
+            # 保证 start() 抛异常时不会有采集流留在外面（#3496）
+            try:
+                self.plugins.stop_all()
+            except Exception:
+                logger.exception("failed to stop plugins after start failure")
+            raise
         if self.config.wakeword_enabled:
             self.event_bridge.publish_service_ready()
         self._is_running = True

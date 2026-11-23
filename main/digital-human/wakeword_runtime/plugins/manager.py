@@ -1,6 +1,9 @@
+import logging
 from typing import Any
 
 from .base import Plugin
+
+logger = logging.getLogger(__name__)
 
 
 class PluginManager:
@@ -25,8 +28,23 @@ class PluginManager:
             plugin.setup(app)
 
     def start_all(self) -> None:
-        for plugin in list(self._plugins):
-            plugin.start()
+        started: list[Plugin] = []
+        try:
+            for plugin in list(self._plugins):
+                plugin.start()
+                started.append(plugin)
+        except Exception:
+            # 启动中途失败要把已经启动的插件按逆序停掉，
+            # 否则先启动的麦克风采集流没人关（#3496）
+            for plugin in reversed(started):
+                try:
+                    plugin.stop()
+                except Exception:
+                    logger.exception(
+                        "plugin stop failed during start rollback: %s",
+                        getattr(plugin, "name", plugin),
+                    )
+            raise
 
     def stop_all(self) -> None:
         for plugin in reversed(self._plugins):

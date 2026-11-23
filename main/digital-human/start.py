@@ -22,8 +22,14 @@ def main() -> int:
             next_config = load_config(runtime_root)
             setup_logging(next_config.log_file, next_config.log_level)
             next_app = TestRuntimeApplication(next_config, http_server.event_bridge)
-            next_app.setup()
-            next_app.start()
+            try:
+                next_app.setup()
+                next_app.start()
+            except Exception as e:
+                # 重启线程里没 try/except 的话异常直接把线程打死、用户看不到提示（#3496）
+                print(f"警告: 唤醒词服务重启失败({e})，测试页面仍可正常使用")
+                next_app.shutdown()
+                return
             app = next_app
 
     http_server.set_restart_handler(restart_runtime)

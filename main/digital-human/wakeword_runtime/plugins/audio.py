@@ -31,6 +31,13 @@ class AudioPlugin(Plugin):
             self.source.stop()
 
     def shutdown(self) -> None:
+        # 丢引用之前先停采集流：stop_all() 没跑到的路径（启动中途失败、shutdown 直连）
+        # 也要能关掉麦克风（#3496）
+        if self.source is not None:
+            try:
+                self.source.stop()
+            except Exception:
+                logger.exception("failed to stop microphone listener during shutdown")
         if self.app is not None:
             self.app.audio_source = None
         self.source = None
