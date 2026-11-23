@@ -39,7 +39,7 @@ Spearheaded by Professor Siyuan Liu's Team (South China University of Technology
 </br>
 Được dẫn dắt bởi nhóm Giáo sư Lưu Tư Nguyên (Đại học Bách khoa Nam Trung Quốc)
 </br>
-<img src="../images/hnlg.jpg" alt="Đại học Bách khoa Nam Trung Quốc" width="50%">
+<img src="../images/hnlg.jpg" alt="Đại học Bách khoa Nam Trung Quốc (华南理工大学)" width="50%">
 </p>
 
 ---

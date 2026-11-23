@@ -39,7 +39,7 @@ Spearheaded by Professor Siyuan Liu's Team (South China University of Technology
 </br>
 刘思源教授团队主导研发（华南理工大学）
 </br>
-<img src="../images/hnlg.jpg" alt="South China University of Technology" width="50%">
+<img src="../images/hnlg.jpg" alt="South China University of Technology (华南理工大学)" width="50%">
 </p>
 
 ---
