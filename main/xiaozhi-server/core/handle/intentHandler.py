@@ -28,6 +28,14 @@ async def handle_user_intent(conn: "ConnectionHandler", text, speaker=None):
     except (json.JSONDecodeError, TypeError):
         pass
 
+    # 音乐指令同音归一（如 ASR 把"切歌"听成"切割"），在意图识别前纠正
+    try:
+        from plugins_func.functions.play_music import normalize_music_text
+
+        text = normalize_music_text(text)
+    except Exception:
+        pass
+
     # 检查是否有明确的退出命令
     _, filtered_text = remove_punctuation_and_length(text)
     if await check_direct_exit(conn, filtered_text):

@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import time
@@ -20,13 +21,18 @@ play_music_function_desc = {
     "type": "function",
     "function": {
         "name": "play_music",
-        "description": "当用户要求播放音乐、歌曲时调用。",
+        "description": "当用户要求播放音乐、歌曲，或者要求切歌、下一首、上一首时调用。用户说'切歌''下一首''换一首''换首歌''不要这首'时 action 填 next；说'上一首''前一首''回到刚才那首'时 action 填 previous；只说播放音乐或指定歌名时 action 填 play。",
         "parameters": {
             "type": "object",
             "properties": {
                 "song_name": {
                     "type": "string",
                     "description": "歌曲名称，如果用户没有指定具体歌名则为'random', 明确指定的时返回音乐的名字 示例: ```用户:播放两只老虎\n参数：两只老虎``` ```用户:播放音乐 \n参数：random ```",
+                },
+                "action": {
+                    "type": "string",
+                    "enum": ["play", "next", "previous"],
+                    "description": "play=播放（默认），next=切歌/下一首，previous=上一首",
                 }
             },
             "required": ["song_name"],
@@ -36,8 +42,26 @@ play_music_function_desc = {
 
 
 @register_function("play_music", play_music_function_desc, ToolType.SYSTEM_CTL)
-async def play_music(conn: "ConnectionHandler", song_name: str):
+async def play_music(
+    conn: "ConnectionHandler", song_name: str = "random", action: str = "play"
+):
     try:
+        action = (action or "play").strip().lower()
+        # 切歌 / 上一首：在当前播放队列里前后移动
+        if action in ("next", "previous"):
+            step = 1 if action == "next" else -1
+            played = await play_relative_music(conn, step)
+            if not played:
+                return ActionResponse(
+                    action=Action.RESPONSE,
+                    result="没有可播放的音乐",
+                    response="没有找到可以播放的音乐，请先把音乐文件放到 music 目录里",
+                )
+            tip = "下一首" if step > 0 else "上一首"
+            return ActionResponse(
+                action=Action.RECORD, result="指令已接收", response=f"好的，为您{tip}"
+            )
+
         music_intent = (
             f"播放音乐 {song_name}" if song_name != "random" else "随机播放音乐"
         )
@@ -93,6 +117,145 @@ def get_music_files(music_dir, music_ext):
                     os.path.splitext(str(file.relative_to(music_dir)))[0]
                 )
     return music_files, music_file_names
+
+
+
+# 同音/口语纠错：把 ASR 容易听错的词归一成音乐控制词（仅在意图识别前生效）
+MUSIC_COMMAND_ALIASES = {
+    "切割": "切歌",
+    "切个歌": "切歌",
+    "切个": "切歌",
+    "切哥": "切歌",
+    "切歌儿": "切歌",
+    "下一曲": "下一首",
+    "下一首歌": "下一首",
+    "下首": "下一首",
+    "换首歌": "切歌",
+    "前一首": "上一首",
+    "上一个": "上一首",
+}
+
+
+def normalize_music_text(text):
+    """把常见的音乐指令同音误识别归一，未命中则原样返回。"""
+    if not text:
+        return text
+    # 长词优先，避免"切个歌"先被"切个"替换成"切歌歌"
+    for wrong, right in sorted(
+        MUSIC_COMMAND_ALIASES.items(), key=lambda kv: len(kv[0]), reverse=True
+    ):
+        if wrong in text:
+            text = text.replace(wrong, right)
+    return text
+
+
+def _get_music_state(conn: "ConnectionHandler"):
+    """每个连接独立的播放状态，记录当前歌与歌单。"""
+    state = getattr(conn, "music_state", None)
+    if not isinstance(state, dict):
+        state = {"playlist": [], "index": -1, "current": None}
+        conn.music_state = state
+    return state
+
+
+async def _stop_current_music(conn: "ConnectionHandler"):
+    """停止设备端当前播放的音频，并清空待推送队列。"""
+    try:
+        conn.client_abort = True
+        conn.clear_queues()
+        await conn.websocket.send(
+            json.dumps(
+                {
+                    "type": "tts",
+                    "state": "stop",
+                    "session_id": getattr(conn, "session_id", conn.sentence_id),
+                }
+            )
+        )
+        conn.clearSpeakStatus()
+    except Exception as e:
+        conn.logger.bind(tag=TAG).warning(f"停止当前音乐失败: {e}")
+    finally:
+        # 允许继续推送下一首
+        conn.client_abort = False
+
+
+def _enqueue_music_file(conn: "ConnectionHandler", selected_music, music_path):
+    """把一首歌的引导语 + 音频文件推入 TTS 队列，并更新播放状态。"""
+    state = _get_music_state(conn)
+    state["current"] = selected_music
+    try:
+        state["index"] = state["playlist"].index(selected_music)
+    except ValueError:
+        pass
+
+    text = _get_random_play_prompt(selected_music)
+    conn.tts.store_tts_text(conn.sentence_id, text)
+
+    if conn.intent_type == "intent_llm":
+        conn.tts.tts_text_queue.put(
+            TTSMessageDTO(
+                sentence_id=conn.sentence_id,
+                sentence_type=SentenceType.FIRST,
+                content_type=ContentType.ACTION,
+            )
+        )
+    conn.tts.tts_text_queue.put(
+        TTSMessageDTO(
+            sentence_id=conn.sentence_id,
+            sentence_type=SentenceType.MIDDLE,
+            content_type=ContentType.TEXT,
+            content_detail=text,
+        )
+    )
+    conn.tts.tts_text_queue.put(
+        TTSMessageDTO(
+            sentence_id=conn.sentence_id,
+            sentence_type=SentenceType.MIDDLE,
+            content_type=ContentType.FILE,
+            content_file=music_path,
+        )
+    )
+    if conn.intent_type == "intent_llm":
+        conn.tts.tts_text_queue.put(
+            TTSMessageDTO(
+                sentence_id=conn.sentence_id,
+                sentence_type=SentenceType.LAST,
+                content_type=ContentType.ACTION,
+            )
+        )
+
+
+async def play_relative_music(conn: "ConnectionHandler", step: int):
+    """在当前歌单里前进/后退 step 首（首尾循环），成功返回 True。"""
+    initialize_music_handler(conn)
+    global MUSIC_CACHE
+
+    files = MUSIC_CACHE.get("music_files") or []
+    if not files:
+        conn.logger.bind(tag=TAG).error("未找到MP3音乐文件")
+        return False
+
+    state = _get_music_state(conn)
+    if list(state.get("playlist") or []) != files:
+        state["playlist"] = list(files)
+
+    playlist = state["playlist"]
+    current = state.get("current")
+    index = playlist.index(current) if current in playlist else -1
+    if index < 0 and step < 0:
+        index = 0  # 没有在播时，"上一首"从歌单开头算起
+    new_index = (index + step) % len(playlist)
+    selected_music = playlist[new_index]
+    music_path = os.path.join(MUSIC_CACHE["music_dir"], selected_music)
+    if not os.path.exists(music_path):
+        conn.logger.bind(tag=TAG).error(f"选定的音乐文件不存在: {music_path}")
+        return False
+
+    await _stop_current_music(conn)
+    _enqueue_music_file(conn, selected_music, music_path)
+    conn.logger.bind(tag=TAG).info(f"切歌到: {selected_music}")
+    return True
 
 
 def initialize_music_handler(conn: "ConnectionHandler"):
@@ -192,42 +355,11 @@ async def play_local_music(conn: "ConnectionHandler", specific_file=None):
         if not os.path.exists(music_path):
             conn.logger.bind(tag=TAG).error(f"选定的音乐文件不存在: {music_path}")
             return
-        text = _get_random_play_prompt(selected_music)
-        conn.tts.store_tts_text(conn.sentence_id, text)
-        # conn.dialogue.put(Message(role="assistant", content=text))
-
-        if conn.intent_type == "intent_llm":
-            conn.tts.tts_text_queue.put(
-                TTSMessageDTO(
-                    sentence_id=conn.sentence_id,
-                    sentence_type=SentenceType.FIRST,
-                    content_type=ContentType.ACTION,
-                )
-            )
-        conn.tts.tts_text_queue.put(
-            TTSMessageDTO(
-                sentence_id=conn.sentence_id,
-                sentence_type=SentenceType.MIDDLE,
-                content_type=ContentType.TEXT,
-                content_detail=text,
-            )
-        )
-        conn.tts.tts_text_queue.put(
-            TTSMessageDTO(
-                sentence_id=conn.sentence_id,
-                sentence_type=SentenceType.MIDDLE,
-                content_type=ContentType.FILE,
-                content_file=music_path,
-            )
-        )
-        if conn.intent_type == "intent_llm":
-            conn.tts.tts_text_queue.put(
-                TTSMessageDTO(
-                    sentence_id=conn.sentence_id,
-                    sentence_type=SentenceType.LAST,
-                    content_type=ContentType.ACTION,
-                )
-            )
+        # 记录歌单（随机播放时也保证"下一首"能在同一份歌单里移动）
+        state = _get_music_state(conn)
+        if list(state.get("playlist") or []) != list(MUSIC_CACHE["music_files"]):
+            state["playlist"] = list(MUSIC_CACHE["music_files"])
+        _enqueue_music_file(conn, selected_music, music_path)
 
     except Exception as e:
         conn.logger.bind(tag=TAG).error(f"播放音乐失败: {str(e)}")
