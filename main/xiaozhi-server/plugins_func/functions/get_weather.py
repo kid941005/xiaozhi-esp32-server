@@ -406,8 +406,15 @@ async def get_weather(conn: "ConnectionHandler", location: str = None, lang: str
         )
         parsed = parse_weather_info(soup) if soup else None
         if not parsed:
-            # 网页降级也拿不到：失败只缓存 5 分钟，别把一次网络抖动放大成 8 小时
-            return _remember_failure("请求天气数据失败")
+            # 网页降级也拿不到：失败只缓存 5 分钟，别把一次网络抖动放大成 8 小时。
+            # 这一句走 Action.RESPONSE 直接回用户（不交给 LLM 改写），与上游用例约定一致。
+            cache_manager.set(
+                CacheType.WEATHER,
+                failure_cache_key,
+                "请求天气数据失败",
+                ttl=WEATHER_FAILURE_TTL,
+            )
+            return ActionResponse(Action.RESPONSE, None, "请求天气数据失败")
         city_name, current_abstract, current_basic, temps_list = parsed
         weather_report = f"您查询的位置是：{city_name}\n\n当前天气: {current_abstract}\n"
         if current_basic:
