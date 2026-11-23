@@ -34,6 +34,7 @@ class ToolCallRunner:
         dialogue,
         config: Dict[str, Any],
         logger,
+        speaker=None,
         report_func: Optional[Callable[..., None]] = None,
         default_timeout: int = 30,
     ):
@@ -43,6 +44,7 @@ class ToolCallRunner:
         self.dialogue = dialogue
         self.config = config
         self.logger = logger
+        self.speaker = speaker
         self.report_func = report_func
         self.default_timeout = default_timeout
 
@@ -116,7 +118,9 @@ class ToolCallRunner:
             self._report(tool_call_data["name"], tool_input)
 
             future = asyncio.run_coroutine_threadsafe(
-                self.func_handler.handle_llm_function_call(self.conn, tool_call_data),
+                self.func_handler.handle_llm_function_call(
+                    self.conn, tool_call_data, speaker=self.speaker
+                ),
                 self.loop,
             )
             futures_with_data.append((future, tool_call_data, tool_input))
