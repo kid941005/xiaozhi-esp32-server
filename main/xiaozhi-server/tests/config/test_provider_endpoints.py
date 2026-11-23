@@ -32,7 +32,6 @@ PROVIDER_ENDPOINT_HOSTS = [
     ("LLM", "VolcesAiGatewayLLM", "volces.com"),
     ("VLLM", "ChatGLMVLLM", "bigmodel.cn"),
     ("VLLM", "QwenVLVLLM", "dashscope.aliyuncs.com"),
-    ("VLLM", "XunfeiSparkLLM", "xf-yun.com"),
     ("ASR", "OpenaiASR", "api.openai.com"),
     ("ASR", "GroqASR", "api.groq.com"),
     ("ASR", "Qwen3ASRFlash", "dashscope.aliyuncs.com"),
@@ -64,6 +63,7 @@ def _endpoint_of(block: dict) -> str:
     PROVIDER_ENDPOINT_HOSTS,
     ids=[f"{m}.{p}" for m, p, _ in PROVIDER_ENDPOINT_HOSTS],
 )
+
 def test_provider_endpoint_matches_platform(
     default_config, module, provider, expected_host
 ):
@@ -79,3 +79,12 @@ def test_provider_endpoint_matches_platform(
         f"{module}.{provider} 的端点 {endpoint!r} 解析出的主机是 {host!r}，"
         f"与平台不符（期望包含 {expected_host!r}）—— 疑似从别的 provider 复制粘贴时带串了"
     )
+
+
+def test_spark_is_not_offered_as_a_vision_provider(default_config):
+    """星火是纯文本模型，带图请求会被拒，所以不能出现在 VLLM 段（#3490）。
+
+    它曾经在 VLLM 段里，base_url 还抄成了火山方舟的地址；既然怎么配都跑不通，
+    出厂配置里就不该再提供这一项，免得用户照着选完发现视觉识别必然失败。
+    """
+    assert "XunfeiSparkLLM" not in (default_config.get("VLLM") or {})
