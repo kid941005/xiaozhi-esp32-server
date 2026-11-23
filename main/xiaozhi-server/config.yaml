@@ -137,14 +137,14 @@ context_providers:
 
 # 插件的基础配置
 plugins:
-  # 获取天气插件的配置，这里填写你的api_key
-  # 这个密钥是项目共用的key，用多了可能会被限制
-  # 想稳定一点就自行申请替换，每天有1000次免费调用
+  # 获取天气插件的配置：和风天气的 api_key / api_host 必须自己申请后填写
+  # 仓库不再预置共享密钥（原来那份已失效，会导致天气功能一部署就是坏的）
   # 申请地址：https://console.qweather.com/#/apps/create-key/over
   # 申请后通过这个链接可以找到自己的apihost：https://console.qweather.com/setting?lang=zh
+  # 留空时 get_weather 不发请求，直接提示「天气功能还没有配置好」，也不写失败缓存
   get_weather:
-    api_host: "mj7p3y7naa.re.qweatherapi.com"
-    api_key: "a861d0d5e7bf4ee1a83d9a9e4f96d4da"
+    api_host: ""
+    api_key: ""
     default_location: "广州"
     # 设备端天气地址（GET /xiaozhi/weather 使用）：填实际所在地，设备不再做 IP 定位。
     # 留空则回退 default_location。

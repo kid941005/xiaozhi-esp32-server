@@ -1,4 +1,7 @@
 import asyncio
+import hashlib
+import time
+
 import httpx
 from bs4 import BeautifulSoup
 from config.logger import setup_logging
@@ -112,19 +115,62 @@ WEATHER_CODE_MAP = {
 }
 
 
-async def fetch_city_info(location, api_key, api_host):
+# 单次天气查询的总预算：城市查询、JSON 主路径、网页降级都从这一份预算里扣，
+# 上游挂起时用户最多等这么久，而不是各段超时相加（#3472）。
+WEATHER_TOTAL_BUDGET = 12.0
+WEATHER_CITY_TIMEOUT = 4.0
+WEATHER_JSON_TIMEOUT = 6.0
+WEATHER_PAGE_TIMEOUT = 5.0
+WEATHER_CONNECT_TIMEOUT = 3.0
+# 失败结果只缓存 5 分钟，只有成功报告才进 8 小时缓存（#3483）
+WEATHER_FAILURE_TTL = 300
+# 成功报告统一以这句开头，供提示词那条路判断「这是真报告，可以进长缓存」（#3478）
+WEATHER_REPORT_PREFIX = "您查询的位置是："
+
+NO_CREDENTIAL_HINT = (
+    "天气功能还没有配置好，请联系管理员在 config.yaml 的 get_weather 里"
+    "填写和风天气的 api_key 和 api_host 后再试。"
+)
+
+
+def is_weather_report(text) -> bool:
+    """是否是真正取到的天气报告（失败提示不算，不能进 8 小时缓存）。"""
+    return isinstance(text, str) and text.startswith(WEATHER_REPORT_PREFIX)
+
+
+def credential_fingerprint(api_host: str, api_key: str) -> str:
+    """凭据指纹：失败缓存键带上它，换 key 之后旧失败缓存自然不再命中（#3483）。"""
+    digest = hashlib.sha256(f"{api_host}\n{api_key}".encode("utf-8")).hexdigest()
+    return digest[:8]
+
+
+def _request_timeout(deadline: float, budget: float) -> httpx.Timeout:
+    """按剩余预算收敛单段超时，避免各段超时相加把最坏耗时拉长。"""
+    remaining = deadline - time.monotonic()
+    total = max(0.5, min(budget, remaining))
+    return httpx.Timeout(total, connect=min(WEATHER_CONNECT_TIMEOUT, total))
+
+
+async def fetch_city_info(location, api_key, api_host, timeout=None):
     url = f"https://{api_host}/geo/v2/city/lookup"
-    async with httpx.AsyncClient(timeout=httpx.Timeout(5.0, connect=3.0)) as client:
-        response = await client.get(
-            url,
-            params={
-                "key": api_key,
-                "location": location,
-                "lang": "zh",
-                "number": 1,
-            },
-            headers=HEADERS,
-        )
+    request_timeout = timeout or httpx.Timeout(
+        WEATHER_CITY_TIMEOUT, connect=WEATHER_CONNECT_TIMEOUT
+    )
+    try:
+        async with httpx.AsyncClient(timeout=request_timeout) as client:
+            response = await client.get(
+                url,
+                params={
+                    "key": api_key,
+                    "location": location,
+                    "lang": "zh",
+                    "number": 1,
+                },
+                headers=HEADERS,
+            )
+    except Exception as e:
+        logger.bind(tag=TAG).warning(f"获取天气城市失败：请求异常 {e}")
+        return None
     try:
         data = response.json()
     except ValueError:
@@ -143,7 +189,7 @@ async def fetch_city_info(location, api_key, api_host):
     return data.get("location", [])[0] if data.get("location") else None
 
 
-async def fetch_weather_data(city_info, api_key, api_host):
+async def fetch_weather_data(city_info, api_key, api_host, timeout=None):
     location_id = city_info.get("id")
     if not location_id:
         return None
@@ -164,8 +210,11 @@ async def fetch_weather_data(city_info, api_key, api_host):
             return None
         return data
 
+    request_timeout = timeout or httpx.Timeout(
+        WEATHER_JSON_TIMEOUT, connect=WEATHER_CONNECT_TIMEOUT
+    )
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(10.0, connect=3.0)) as client:
+        async with httpx.AsyncClient(timeout=request_timeout) as client:
             now, daily = await asyncio.gather(
                 request(client, "now"), request(client, "7d")
             )
@@ -209,16 +258,29 @@ def build_weather_report(city_info, now_data, daily_data):
     return weather_report
 
 
-async def fetch_weather_page(url):
-    async with httpx.AsyncClient(
-        timeout=httpx.Timeout(10.0, connect=3.0), follow_redirects=True
-    ) as client:
-        response = await client.get(url, headers=HEADERS)
+async def fetch_weather_page(url, timeout=None):
+    request_timeout = timeout or httpx.Timeout(
+        WEATHER_PAGE_TIMEOUT, connect=WEATHER_CONNECT_TIMEOUT
+    )
+    try:
+        async with httpx.AsyncClient(
+            timeout=request_timeout, follow_redirects=True
+        ) as client:
+            response = await client.get(url, headers=HEADERS)
+    except Exception as e:
+        logger.bind(tag=TAG).warning(f"抓取天气网页失败：{e}")
+        return None
     return BeautifulSoup(response.text, "html.parser") if response.status_code == 200 else None
 
 
 def parse_weather_info(soup):
-    city_name = soup.select_one("h1.c-submenu__location").get_text(strip=True)
+    # 网页结构一变、或者反爬返回了别的内容时，取不到城市节点就当作解析失败，
+    # 不要抛 AttributeError 把原始报错冒到用户面前（#3472）。
+    city_node = soup.select_one("h1.c-submenu__location")
+    if city_node is None:
+        logger.bind(tag=TAG).warning("解析天气网页失败：找不到城市节点")
+        return None
+    city_name = city_node.get_text(strip=True)
 
     current_abstract = soup.select_one(".c-city-weather-current .current-abstract")
     current_abstract = (
@@ -236,9 +298,14 @@ def parse_weather_info(soup):
 
     temps_list = []
     for row in soup.select(".city-forecast-tabs__row")[:7]:  # 取前7天的数据
-        date = row.select_one(".date-bg .date").get_text(strip=True)
+        date_node = row.select_one(".date-bg .date")
+        if date_node is None:
+            continue
+        date = date_node.get_text(strip=True)
+        icon_node = row.select_one(".date-bg .icon")
+        icon_src = icon_node.get("src") if icon_node is not None else None
         weather_code = (
-            row.select_one(".date-bg .icon")["src"].split("/")[-1].split(".")[0]
+            icon_src.split("/")[-1].split(".")[0] if isinstance(icon_src, str) else ""
         )
         weather = WEATHER_CODE_MAP.get(weather_code, "未知")
         temps = [span.get_text(strip=True) for span in row.select(".tmp-cont .temp")]
@@ -253,10 +320,18 @@ async def get_weather(conn: "ConnectionHandler", location: str = None, lang: str
     from core.utils.cache.manager import cache_manager, CacheType
 
     weather_config = conn.config.get("plugins", {}).get("get_weather", {})
-    api_host = weather_config.get("api_host", "mj7p3y7naa.re.qweatherapi.com")
-    api_key = weather_config.get("api_key", "a861d0d5e7bf4ee1a83d9a9e4f96d4da")
+    api_host = str(weather_config.get("api_host") or "").strip()
+    api_key = str(weather_config.get("api_key") or "").strip()
     default_location = weather_config.get("default_location", "广州")
     client_ip = conn.client_ip
+
+    # 没有凭据就只给用户一句提示：不发请求、不写任何缓存（#3472/#3478）。
+    # 管理员把 api_key / api_host 填好之后，下一次提问就能出真实报告。
+    if not api_host or not api_key:
+        logger.bind(tag=TAG).warning(
+            "get_weather 未配置 api_host/api_key，已跳过天气查询"
+        )
+        return ActionResponse(Action.RESPONSE, None, NO_CREDENTIAL_HINT)
 
     # 优先使用用户提供的location参数
     if not location:
@@ -285,23 +360,55 @@ async def get_weather(conn: "ConnectionHandler", location: str = None, lang: str
     if cached_weather_report:
         return ActionResponse(Action.REQLLM, cached_weather_report, None)
 
-    # 缓存未命中，获取实时天气数据
-    city_info = await fetch_city_info(location, api_key, api_host)
-    if not city_info:
-        return ActionResponse(
-            Action.REQLLM,
-            f"暂时查不到 {location} 的天气（城市未找到或天气服务不可用），请稍后再试",
-            None,
+    # 失败缓存带上凭据指纹：换过 key 之后旧的失败结果不再命中（#3483）
+    credential_fp = credential_fingerprint(api_host, api_key)
+    failure_cache_key = f"failed_weather_{location}_{lang}_{credential_fp}"
+    cached_failure = cache_manager.get(CacheType.WEATHER, failure_cache_key)
+    if cached_failure:
+        return ActionResponse(Action.REQLLM, cached_failure, None)
+
+    def _remember_failure(hint: str) -> ActionResponse:
+        cache_manager.set(
+            CacheType.WEATHER, failure_cache_key, hint, ttl=WEATHER_FAILURE_TTL
         )
-    weather_data = await fetch_weather_data(city_info, api_key, api_host)
+        return ActionResponse(Action.REQLLM, hint, None)
+
+    # 一次查询共用一份总预算，避免城市查询 + JSON + 网页降级三段超时相加（#3472）
+    deadline = time.monotonic() + WEATHER_TOTAL_BUDGET
+
+    # 缓存未命中，获取实时天气数据
+    city_info = await fetch_city_info(
+        location,
+        api_key,
+        api_host,
+        timeout=_request_timeout(deadline, WEATHER_CITY_TIMEOUT),
+    )
+    if not city_info:
+        return _remember_failure(
+            f"暂时查不到 {location} 的天气（城市未找到或天气服务不可用），请稍后再试"
+        )
+    weather_data = await fetch_weather_data(
+        city_info,
+        api_key,
+        api_host,
+        timeout=_request_timeout(deadline, WEATHER_JSON_TIMEOUT),
+    )
     if weather_data:
         weather_report = build_weather_report(city_info, *weather_data)
     else:
         fx_link = city_info.get("fxLink")
-        soup = await fetch_weather_page(fx_link) if fx_link else None
-        if not soup:
-            return ActionResponse(Action.REQLLM, None, "请求天气数据失败")
-        city_name, current_abstract, current_basic, temps_list = parse_weather_info(soup)
+        soup = (
+            await fetch_weather_page(
+                fx_link, timeout=_request_timeout(deadline, WEATHER_PAGE_TIMEOUT)
+            )
+            if fx_link
+            else None
+        )
+        parsed = parse_weather_info(soup) if soup else None
+        if not parsed:
+            # 网页降级也拿不到：失败只缓存 5 分钟，别把一次网络抖动放大成 8 小时
+            return _remember_failure("请求天气数据失败")
+        city_name, current_abstract, current_basic, temps_list = parsed
         weather_report = f"您查询的位置是：{city_name}\n\n当前天气: {current_abstract}\n"
         if current_basic:
             weather_report += "详细参数：\n"

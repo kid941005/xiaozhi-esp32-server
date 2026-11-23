@@ -16,6 +16,9 @@ from jinja2 import Template
 
 TAG = __name__
 
+# 天气取不到时塞进提示词的那句话：留空模型会自己编一个天气（#3478）
+WEATHER_UNAVAILABLE_HINT = "（当地天气暂时查不到；用户问天气时如实说明，不要编造。）"
+
 WEEKDAY_MAP = {
     "Monday": "星期一",
     "Tuesday": "星期二",
@@ -168,18 +171,21 @@ class PromptManager:
     def _get_weather_info(self, conn: "ConnectionHandler", location: str) -> str:
         """获取天气信息"""
         try:
-            # 先从缓存获取
+            from plugins_func.functions.get_weather import (
+                get_weather,
+                is_weather_report,
+            )
+            from plugins_func.register import Action, ActionResponse
+
+            # 先从缓存获取；只认真正的天气报告，历史遗留的空值/失败提示一律绕开（#3478）
             cached_weather = self.cache_manager.get(self.CacheType.WEATHER, location)
-            if cached_weather is not None:
+            if is_weather_report(cached_weather):
                 return cached_weather
 
             # 缓存未命中，调用 async get_weather 函数
             # Windows ProactorEventLoop 不支持 run_coroutine_threadsafe().result()
             # 因此用 call_soon_threadsafe 提交任务 + threading.Event 等待结果
             # 注意：Event.wait() 只阻塞当前线程池线程，不阻塞主事件循环
-            from plugins_func.functions.get_weather import get_weather
-            from plugins_func.register import ActionResponse
-
             result_holder = []
             exception_holder = []
 
@@ -201,14 +207,24 @@ class PromptManager:
                 raise exception_holder[0]
             result = result_holder[0]
             if isinstance(result, ActionResponse):
+                if result.action == Action.RESPONSE:
+                    # 插件明确说明「天气功能没配置」，把给用户的那句话交回提示词，
+                    # 留空模型会自己编一个天气（#3478）
+                    return result.response or WEATHER_UNAVAILABLE_HINT
                 weather_report = result.result
-                self.cache_manager.set(self.CacheType.WEATHER, location, weather_report)
-                return weather_report
-            return "天气信息获取失败"
+                if is_weather_report(weather_report):
+                    # 只有成功的报告才进 8 小时缓存
+                    self.cache_manager.set(
+                        self.CacheType.WEATHER, location, weather_report
+                    )
+                    return weather_report
+                # 失败结果（网络不通、城市找不到）不写长缓存，下次重新取
+                return result.response or weather_report or WEATHER_UNAVAILABLE_HINT
+            return WEATHER_UNAVAILABLE_HINT
 
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"获取天气信息失败: {e}")
-            return "天气信息获取失败"
+            return WEATHER_UNAVAILABLE_HINT
 
     def update_context_info(self, conn, client_ip: str):
         """同步更新上下文信息"""
