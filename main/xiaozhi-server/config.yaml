@@ -187,7 +187,7 @@ plugins:
   fnmusic_gateway:
     # 飞牛音乐网关（fnmusic-gateway）地址，留空表示不启用本组工具
     base_url: ""  # 例如 http://192.168.50.100:8766
-    enabled: true  # 关闭后 fnmusic_* 工具会提示未配置
+    enabled: false  # 默认关闭；使用 MCP 接入点时保持 false，改用内置插件才设为 true
     timeout: 10  # 请求网关的超时时间，单位为秒
     quality: ""  # 音质参数，留空使用网关默认值
     device_tool: "self.music.play_url"  # 设备端播放工具名
