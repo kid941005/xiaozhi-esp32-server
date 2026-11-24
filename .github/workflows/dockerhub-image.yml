@@ -1,6 +1,7 @@
 name: Publish Images (GHCR + Docker Hub)
 
-# 一次构建同时推送到 GHCR 与 Docker Hub（server + web 两个镜像，linux/amd64）。
+# server 镜像：同时推送 GHCR 与 Docker Hub（linux/amd64）。
+# web 智控台镜像：推送 Docker Hub（linux/amd64）；GHCR 的多架构 web 镜像由 docker-image.yml 发布，避免 tag 冲突。
 # GHCR 使用内置 GITHUB_TOKEN（需要 packages: write），无需额外 Secrets。
 # Docker Hub 需要仓库 Secrets：DOCKERHUB_USERNAME、DOCKERHUB_TOKEN（账号 + Access Token，Read/Write）；
 # 缺失时只推 GHCR，流水线不失败。
@@ -144,7 +145,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   publish-web:
-    name: Build and push web image (GHCR + Docker Hub)
+    name: Build and push web image (Docker Hub)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -167,13 +168,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Login to Docker Hub
         if: env.DH_USER != '' && env.DH_TOKEN != ''
@@ -205,18 +199,16 @@ jobs:
         id: tags
         run: |
           WEBVER="${{ steps.v.outputs.app_version }}"
-          GHCR_REPO="ghcr.io/${{ github.repository_owner }}/xiaozhi-esp32-server"
-          TAGS="$GHCR_REPO:web_$WEBVER"
-          if [ -n "$DH_USER" ]; then TAGS="$TAGS"$'\n'"$DH_USER/xiaozhi-esp32-server:web_$WEBVER"; fi
+          TAGS=""
+          if [ -n "$DH_USER" ]; then TAGS="$DH_USER/xiaozhi-esp32-server:web_$WEBVER"; fi
           PUSH_LATEST=false
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             if [ "${{ inputs.push_latest }}" = "true" ] && [ "$WEBVER" != "latest" ]; then PUSH_LATEST=true; fi
           elif [ "$WEBVER" != "latest" ]; then
             PUSH_LATEST=true
           fi
-          if [ "$PUSH_LATEST" = "true" ]; then
-            TAGS="$TAGS"$'\n'"$GHCR_REPO:web_latest"
-            if [ -n "$DH_USER" ]; then TAGS="$TAGS"$'\n'"$DH_USER/xiaozhi-esp32-server:web_latest"; fi
+          if [ "$PUSH_LATEST" = "true" ] && [ -n "$DH_USER" ]; then
+            TAGS="$TAGS"$'\n'"$DH_USER/xiaozhi-esp32-server:web_latest"
           fi
           {
             echo "list<<EOF"
@@ -231,7 +223,7 @@ jobs:
           context: .
           file: Dockerfile-web
           platforms: linux/amd64
-          push: true
+          push: ${{ env.DH_USER != '' }}
           tags: ${{ steps.tags.outputs.list }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -242,9 +234,6 @@ jobs:
       - name: Output web image info
         run: |
           WEBVER="${{ steps.v.outputs.app_version }}"
-          GHCR_REPO="ghcr.io/${{ github.repository_owner }}/xiaozhi-esp32-server"
-          echo "已推送 GHCR：$GHCR_REPO:web_$WEBVER"
-          docker buildx imagetools inspect "$GHCR_REPO:web_$WEBVER" || true
           if [ -n "$DH_USER" ]; then
             echo "已推送 Docker Hub：$DH_USER/xiaozhi-esp32-server:web_$WEBVER"
             docker buildx imagetools inspect "$DH_USER/xiaozhi-esp32-server:web_$WEBVER" || true
@@ -252,6 +241,5 @@ jobs:
           {
             echo "### 智控台（web）镜像已发布"
             echo ""
-            echo "- GHCR: $GHCR_REPO:web_$WEBVER"
-            if [ -n "$DH_USER" ]; then echo "- Docker Hub: $DH_USER/xiaozhi-esp32-server:web_$WEBVER"; fi
+            if [ -n "$DH_USER" ]; then echo "- Docker Hub: $DH_USER/xiaozhi-esp32-server:web_$WEBVER"; else echo "- 未配置 Docker Hub 凭据，仅构建未推送。"; fi
           } >> "$GITHUB_STEP_SUMMARY"
