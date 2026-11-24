@@ -71,6 +71,7 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             BUILDKIT_PROGRESS=plain
+            APP_VERSION=${{ env.VERSION }}
 
       # 构建 manager-api 镜像
       - name: Build and push manager-web

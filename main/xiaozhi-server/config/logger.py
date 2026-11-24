@@ -6,7 +6,9 @@ from config.config_loader import load_config
 from config.settings import check_config_file
 from core.utils.cache.manager import cache_manager, CacheType
 
-SERVER_VERSION = "0.9.8"
+# 版本号由构建时注入（Dockerfile-server 的 ARG APP_VERSION -> ENV APP_VERSION），
+# 本地直接运行没有该变量时显示 dev，避免版本号与镜像真实版本不一致。
+SERVER_VERSION = (os.environ.get("APP_VERSION") or "").strip() or "dev"
 _logger_initialized = False
 
 

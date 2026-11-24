@@ -1,6 +1,10 @@
 # 生产镜像，仅包含应用代码
 FROM ghcr.io/xinnan-tech/xiaozhi-esp32-server:server-base
 
+# 应用版本号：构建时注入（CI 传 --build-arg APP_VERSION=<版本>），运行时由 config/logger.py 读环境变量
+ARG APP_VERSION=dev
+ENV APP_VERSION=${APP_VERSION}
+
 COPY main/xiaozhi-server .
 
 # 启动应用

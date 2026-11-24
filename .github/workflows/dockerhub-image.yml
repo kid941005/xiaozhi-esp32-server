@@ -83,6 +83,7 @@ jobs:
             V="latest"
           fi
           echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "app_version=${V#v}" >> "$GITHUB_OUTPUT"
           echo "resolved version: $V"
 
       - name: Compose image tags
@@ -121,6 +122,7 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             BUILDKIT_PROGRESS=plain
+            APP_VERSION=${{ steps.v.outputs.app_version }}
 
       - name: Output image info
         run: |
