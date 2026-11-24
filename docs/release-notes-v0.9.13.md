@@ -4,6 +4,40 @@
 
 ## 镜像
 
+| 镜像地址 | 说明 |
+|---|---|
+| `kid941005/xiaozhi-esp32-server:v0.9.13` | Docker Hub（public，无需登录），固定版本，建议用于生产部署与回滚 |
+| `kid941005/xiaozhi-esp32-server:latest` | Docker Hub（public），跟随最近一次发布，当前等同 `v0.9.13` |
+| `ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.13` | GHCR（public，无需登录），固定版本 |
+| `ghcr.io/kid941005/xiaozhi-esp32-server:latest` | GHCR（public，无需登录），跟随最近一次发布，当前等同 `v0.9.13` |
+
+镜像 digest（同一提交、不同构建环境，内容等价）：
+- Docker Hub：`sha256:420f9ddd5d7f70b0d471f9ef02de0db765276acf7a171be49566531b68f90892`（linux/amd64，压缩 3.3 GB / 解压 10.8 GB）
+- GHCR：`sha256:420f9ddd5d7f70b0d471f9ef02de0db765276acf7a171be49566531b68f90892`（linux/amd64，10.8 GB）
+
+拉取与使用：
+
+```bash
+# Docker Hub（public，可直接拉取）
+docker pull kid941005/xiaozhi-esp32-server:v0.9.13
+
+# GHCR（public，可直接拉取）
+docker pull ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.13
+```
+
+在 `docker-compose.yml` 中把 server 服务的 `image` 换成上述地址即可，例如：
+
+```yaml
+services:
+  xiaozhi-esp32-server:
+    image: kid941005/xiaozhi-esp32-server:v0.9.13            # Docker Hub
+    # image: ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.13  # GHCR 备用
+```
+
+> Docker Hub 与 GHCR 上的镜像均为 **public**，可直接拉取、无需登录。若 GHCR 仍报 `unauthorized` / `denied`，多半是本地缓存了旧的私有凭据：先 `docker logout ghcr.io` 再重试。
+
+> 镜像由 GitHub Actions 流水线 [`.github/workflows/dockerhub-image.yml`](.github/workflows/dockerhub-image.yml) 构建：推送 `v*.*.*` 标签或手动触发时，一次构建同时发布到 GHCR 与 Docker Hub（同一组标签）。
+
 ## MCP 接入点客户端加固
 
 此前主干只做裸 `websockets.connect(url)`：断线后等待中的工具调用会一直挂到超时，且没有重连；MCP 服务返回未知 action 时还会因枚举索引报错、把英文动作名直接念给用户。本次移植并保留主干新特性（speaker 透传、meta 负载）后落地：
