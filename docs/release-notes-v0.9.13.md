@@ -24,25 +24,31 @@
 拉取与使用：
 
 ```bash
-# Docker Hub（public，可直接拉取）
+# 服务端（public，可直接拉取）
 docker pull kid941005/xiaozhi-esp32-server:v0.9.13
+docker pull ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.13          # GHCR 备用
 
-# GHCR（public，可直接拉取）
-docker pull ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.13
+# 智控台（public，可直接拉取）
+docker pull kid941005/xiaozhi-esp32-server:web_0.9.13
+docker pull ghcr.io/kid941005/xiaozhi-esp32-server:web_0.9.13   # GHCR 备用（多架构）
 ```
 
-在 `docker-compose.yml` 中把 server 服务的 `image` 换成上述地址即可，例如：
+在 `docker-compose.yml` 中替换对应服务的 `image` 即可，例如：
 
 ```yaml
 services:
   xiaozhi-esp32-server:
     image: kid941005/xiaozhi-esp32-server:v0.9.13            # Docker Hub
     # image: ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.13  # GHCR 备用
+  manager-web:
+    image: kid941005/xiaozhi-esp32-server:web_0.9.13        # Docker Hub（智控台）
 ```
 
 > Docker Hub 与 GHCR 上的镜像均为 **public**，可直接拉取、无需登录。若 GHCR 仍报 `unauthorized` / `denied`，多半是本地缓存了旧的私有凭据：先 `docker logout ghcr.io` 再重试。
 
-> 镜像由 GitHub Actions 流水线 [`.github/workflows/dockerhub-image.yml`](.github/workflows/dockerhub-image.yml) 构建：推送 `v*.*.*` 标签或手动触发时，一次构建同时发布到 GHCR 与 Docker Hub（同一组标签）。
+> 服务端镜像由流水线 [`.github/workflows/dockerhub-image.yml`](.github/workflows/dockerhub-image.yml) 构建：推送 `v*.*.*` 标签或手动触发时，一次构建同时发布到 GHCR 与 Docker Hub。
+
+> 智控台 web 镜像同样由该流水线构建并推送到 Docker Hub；GHCR 上的 web 镜像（多架构 amd64 + arm64）由 [`.github/workflows/docker-image.yml`](.github/workflows/docker-image.yml) 发布，两者标签格式均为 `web_<版本>`。
 
 ## MCP 接入点客户端加固
 
