@@ -190,18 +190,24 @@ Websocket接口地址: wss://2662r3426b.vicp.fun/xiaozhi/v1/
 
 <!-- IMAGES:BEGIN -->
 
-本 fork 提供已构建好的服务端镜像（含安全加固、上下文源并发化、工具调用治理与测试工程化，详见 [v0.9.13 Release](https://github.com/kid941005/xiaozhi-esp32-server/releases/tag/v0.9.13)）：
+本 fork 提供已构建好的服务端与智控台镜像（含安全加固、上下文源并发化、工具调用治理与测试工程化，详见 [v0.9.13 Release](https://github.com/kid941005/xiaozhi-esp32-server/releases/tag/v0.9.13)）：
 
 | 镜像地址 | 说明 |
 |---|---|
-| `kid941005/xiaozhi-esp32-server:v0.9.13` | Docker Hub（public，无需登录），固定版本，建议用于生产部署与回滚 |
-| `kid941005/xiaozhi-esp32-server:latest` | Docker Hub（public），跟随最近一次发布，当前等同 `v0.9.13` |
-| `ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.13` | GHCR（public，无需登录），固定版本 |
-| `ghcr.io/kid941005/xiaozhi-esp32-server:latest` | GHCR（public，无需登录），跟随最近一次发布，当前等同 `v0.9.13` |
+| `kid941005/xiaozhi-esp32-server:v0.9.13` | Docker Hub（public，无需登录），服务端固定版本，建议用于生产部署与回滚 |
+| `kid941005/xiaozhi-esp32-server:latest` | Docker Hub（public），服务端跟随最近一次发布，当前等同 `v0.9.13` |
+| `kid941005/xiaozhi-esp32-server:web_0.9.13` | Docker Hub（public），智控台（前端 + manager-api）固定版本 |
+| `kid941005/xiaozhi-esp32-server:web_latest` | Docker Hub（public），智控台跟随最近一次发布 |
+| `ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.13` | GHCR（public，无需登录），服务端固定版本 |
+| `ghcr.io/kid941005/xiaozhi-esp32-server:latest` | GHCR（public，无需登录），服务端跟随最近一次发布，当前等同 `v0.9.13` |
+| `ghcr.io/kid941005/xiaozhi-esp32-server:web_0.9.13` | GHCR（public），智控台固定版本（多架构 amd64 + arm64） |
+| `ghcr.io/kid941005/xiaozhi-esp32-server:web_latest` | GHCR（public），智控台跟随最近一次发布（多架构） |
 
 镜像 digest（同一提交、不同构建环境，内容等价）：
-- Docker Hub：`sha256:420f9ddd5d7f70b0d471f9ef02de0db765276acf7a171be49566531b68f90892`（linux/amd64，压缩 3.3 GB / 解压 10.8 GB）
-- GHCR：`sha256:420f9ddd5d7f70b0d471f9ef02de0db765276acf7a171be49566531b68f90892`（linux/amd64，10.8 GB）
+- Docker Hub 服务端：`sha256:10a05c92bd29daac088784ce7ac9297f64fd2dd9314edddd5918e195b7700f1e`（linux/amd64，压缩约 3.5 GB / 解压 10.8 GB）
+- GHCR 服务端：`sha256:10a05c92bd29daac088784ce7ac9297f64fd2dd9314edddd5918e195b7700f1e`（linux/amd64，10.8 GB）
+- Docker Hub 智控台：`sha256:5fbbe935eae293e3b85d0b7659975261e817104c96366a17468c599c6556a9a5`（linux/amd64）
+- GHCR 智控台：`sha256:1e75916af7fdcf845b03cae5b5dcc2aa1904d40611340c9c3213b3f68235c72a`（多架构 index，amd64 + arm64）
 
 拉取与使用：
 

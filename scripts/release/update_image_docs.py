@@ -34,22 +34,32 @@ def fetch_digest(image):
 def image_rows(ver):
     dh = "%s/xiaozhi-esp32-server" % OWNER
     gh = "ghcr.io/%s/xiaozhi-esp32-server" % OWNER
+    wv = ver[1:] if ver.startswith("v") else ver
     return [
         "| 镜像地址 | 说明 |",
         "|---|---|",
-        "| `%s:%s` | Docker Hub（public，无需登录），固定版本，建议用于生产部署与回滚 |" % (dh, ver),
-        "| `%s:latest` | Docker Hub（public），跟随最近一次发布，当前等同 `%s` |" % (dh, ver),
-        "| `%s:%s` | GHCR（public，无需登录），固定版本 |" % (gh, ver),
-        "| `%s:latest` | GHCR（public，无需登录），跟随最近一次发布，当前等同 `%s` |" % (gh, ver),
+        "| `%s:%s` | Docker Hub（public，无需登录），服务端固定版本，建议用于生产部署与回滚 |" % (dh, ver),
+        "| `%s:latest` | Docker Hub（public），服务端跟随最近一次发布，当前等同 `%s` |" % (dh, ver),
+        "| `%s:web_%s` | Docker Hub（public），智控台（前端 + manager-api）固定版本 |" % (dh, wv),
+        "| `%s:web_latest` | Docker Hub（public），智控台跟随最近一次发布 |" % dh,
+        "| `%s:%s` | GHCR（public，无需登录），服务端固定版本 |" % (gh, ver),
+        "| `%s:latest` | GHCR（public，无需登录），服务端跟随最近一次发布，当前等同 `%s` |" % (gh, ver),
+        "| `%s:web_%s` | GHCR（public），智控台固定版本（多架构 amd64 + arm64） |" % (gh, wv),
+        "| `%s:web_latest` | GHCR（public），智控台跟随最近一次发布（多架构） |" % gh,
     ]
 
 
-def digest_lines(dhd, ghc):
-    return [
+def digest_lines(dhd, ghc, dhw=None, ghw=None):
+    lines = [
         "镜像 digest（同一提交、不同构建环境，内容等价）：",
-        "- Docker Hub：`%s`（linux/amd64，压缩 3.3 GB / 解压 10.8 GB）" % dhd,
-        "- GHCR：`%s`（linux/amd64，10.8 GB）" % ghc,
+        "- Docker Hub 服务端：`%s`（linux/amd64，压缩约 3.5 GB / 解压 10.8 GB）" % dhd,
+        "- GHCR 服务端：`%s`（linux/amd64，10.8 GB）" % ghc,
     ]
+    if dhw:
+        lines.append("- Docker Hub 智控台：`%s`（linux/amd64）" % dhw)
+    if ghw:
+        lines.append("- GHCR 智控台：`%s`（多架构 index，amd64 + arm64）" % ghw)
+    return lines
 
 
 def pull_lines(ver):
@@ -81,26 +91,26 @@ def pull_lines(ver):
     ]
 
 
-def readme_block(ver, dhd, ghc):
-    lines = ["本 fork 提供已构建好的服务端镜像（含安全加固、上下文源并发化、工具调用治理与测试工程化，详见 [%s Release](https://github.com/%s/xiaozhi-esp32-server/releases/tag/%s)）：" % (ver, OWNER, ver), ""]
+def readme_block(ver, dhd, ghc, dhw=None, ghw=None):
+    lines = ["本 fork 提供已构建好的服务端与智控台镜像（含安全加固、上下文源并发化、工具调用治理与测试工程化，详见 [%s Release](https://github.com/%s/xiaozhi-esp32-server/releases/tag/%s)）：" % (ver, OWNER, ver), ""]
     lines += image_rows(ver)
-    lines += [""] + digest_lines(dhd, ghc)
+    lines += [""] + digest_lines(dhd, ghc, dhw, ghw)
     lines += [""] + pull_lines(ver)
     return "\n".join([BEGIN, ""] + lines + ["", END])
 
 
-def notes_block(ver, dhd, ghc):
+def notes_block(ver, dhd, ghc, dhw=None, ghw=None):
     lines = image_rows(ver)
-    lines += [""] + digest_lines(dhd, ghc)
+    lines += [""] + digest_lines(dhd, ghc, dhw, ghw)
     lines += [""] + pull_lines(ver)
     return "\n".join(lines)
 
 
-def update_readme(path, ver, dhd, ghc):
+def update_readme(path, ver, dhd, ghc, dhw=None, ghw=None):
     text = io.open(path, encoding="utf-8").read()
     if BEGIN not in text or END not in text:
         sys.exit("README 缺少 %s / %s 标记，请先手工加上" % (BEGIN, END))
-    new = re.sub(re.escape(BEGIN) + r".*?" + re.escape(END), lambda _: readme_block(ver, dhd, ghc), text, count=1, flags=re.S)
+    new = re.sub(re.escape(BEGIN) + r".*?" + re.escape(END), lambda _: readme_block(ver, dhd, ghc, dhw, ghw), text, count=1, flags=re.S)
     if new != text:
         io.open(path, "w", encoding="utf-8", newline="\n").write(new)
         print("README 已更新：%s" % path)
@@ -108,7 +118,7 @@ def update_readme(path, ver, dhd, ghc):
         print("README 无需变更：%s" % path)
 
 
-def update_notes(path, ver, dhd, ghc):
+def update_notes(path, ver, dhd, ghc, dhw=None, ghw=None):
     text = io.open(path, encoding="utf-8").read()
     m = re.search(r"^## 镜像[^\n]*\n", text, re.M)
     if not m:
@@ -116,7 +126,7 @@ def update_notes(path, ver, dhd, ghc):
     start = m.end()
     nxt = re.search(r"^## ", text[start:], re.M)
     end = start + nxt.start() if nxt else len(text)
-    new = text[:start] + "\n" + notes_block(ver, dhd, ghc) + "\n\n" + text[end:]
+    new = text[:start] + "\n" + notes_block(ver, dhd, ghc, dhw, ghw) + "\n\n" + text[end:]
     io.open(path, "w", encoding="utf-8", newline="\n").write(new)
     print("Release 说明已更新：%s" % path)
 
@@ -128,18 +138,27 @@ def main():
     ap.add_argument("--notes", default=None, help="Release 说明文件（含 ## 镜像 小节）")
     ap.add_argument("--dh-digest", default=None)
     ap.add_argument("--ghcr-digest", default=None)
+    ap.add_argument("--dh-web-digest", default=None, help="Docker Hub 智控台镜像 digest")
+    ap.add_argument("--ghcr-web-digest", default=None, help="GHCR 智控台（多架构）index digest")
     a = ap.parse_args()
     ver = a.version
     dh_img = "%s/xiaozhi-esp32-server:%s" % (OWNER, ver)
     gh_img = "ghcr.io/%s/xiaozhi-esp32-server:%s" % (OWNER, ver)
+    wv = ver[1:] if ver.startswith("v") else ver
+    dh_web_img = "%s/xiaozhi-esp32-server:web_%s" % (OWNER, wv)
+    gh_web_img = "ghcr.io/%s/xiaozhi-esp32-server:web_%s" % (OWNER, wv)
     dhd = a.dh_digest or fetch_digest(dh_img)
     ghc = a.ghcr_digest or fetch_digest(gh_img)
+    dhw = a.dh_web_digest or fetch_digest(dh_web_img)
+    ghw = a.ghcr_web_digest or fetch_digest(gh_web_img)
     print("version=%s" % ver)
     print("dockerhub=%s digest=%s" % (dh_img, dhd))
     print("ghcr=%s digest=%s" % (gh_img, ghc))
-    update_readme(a.readme, ver, dhd, ghc)
+    print("dockerhub-web=%s digest=%s" % (dh_web_img, dhw))
+    print("ghcr-web=%s digest=%s" % (gh_web_img, ghw))
+    update_readme(a.readme, ver, dhd, ghc, dhw, ghw)
     if a.notes:
-        update_notes(a.notes, ver, dhd, ghc)
+        update_notes(a.notes, ver, dhd, ghc, dhw, ghw)
 
 
 if __name__ == "__main__":
