@@ -2,6 +2,7 @@
 
 import json
 import asyncio
+import random
 import re
 import websockets
 from config.logger import setup_logging
@@ -17,10 +18,19 @@ async def connect_mcp_endpoint(mcp_endpoint_url: str, conn=None) -> MCPEndpointC
     if not mcp_endpoint_url or "你的" in mcp_endpoint_url or mcp_endpoint_url == "null":
         return None
 
+    websocket = None
+    mcp_client = None
     try:
-        websocket = await websockets.connect(mcp_endpoint_url)
+        websocket = await websockets.connect(
+            mcp_endpoint_url,
+            max_size=16 * 1024 * 1024,
+            ping_interval=20,
+            ping_timeout=20,
+            open_timeout=15,
+        )
 
         mcp_client = MCPEndpointClient(conn)
+        mcp_client.mcp_endpoint_url = mcp_endpoint_url
         mcp_client.set_websocket(websocket)
 
         # 启动消息监听器
@@ -40,6 +50,14 @@ async def connect_mcp_endpoint(mcp_endpoint_url: str, conn=None) -> MCPEndpointC
 
     except Exception as e:
         logger.bind(tag=TAG).error(f"连接MCP接入点失败: {e}")
+        if mcp_client is not None:
+            mcp_client.closed = True
+            mcp_client.websocket = None
+        if websocket is not None:
+            try:
+                await websocket.close()
+            except Exception:
+                pass
         return None
 
 
@@ -54,6 +72,47 @@ async def _message_listener(mcp_client: MCPEndpointClient):
         logger.bind(tag=TAG).error(f"MCP接入点消息监听器错误: {e}")
     finally:
         await mcp_client.set_ready(False)
+        await mcp_client.fail_all_call_results()
+        # 断线后指数退避重连；主动 close 或已有重连任务时不重复启动。
+        if not mcp_client.closed and not mcp_client.reconnecting:
+            mcp_client.reconnecting = True
+            mcp_client.reconnect_task = asyncio.create_task(
+                _reconnect_mcp_endpoint(mcp_client)
+            )
+
+
+async def _reconnect_mcp_endpoint(old_client: MCPEndpointClient):
+    """断线后按指数退避重连，成功后替换 conn.mcp_endpoint_client 并刷新工具缓存。"""
+    url = getattr(old_client, "mcp_endpoint_url", None)
+    if not url:
+        old_client.reconnecting = False
+        return
+    delay = 1.0
+    try:
+        while not old_client.closed:
+            await asyncio.sleep(delay + random.uniform(0, delay * 0.5))
+            if old_client.closed:
+                return
+            logger.bind(tag=TAG).info(f"尝试重连 MCP 接入点（{delay:.0f}s 退避）")
+            new_client = await connect_mcp_endpoint(url, old_client.conn)
+            if not new_client:
+                delay = min(delay * 2, 600.0)
+                continue
+            old_client.closed = True
+            old_client.websocket = None
+            if getattr(old_client, "conn", None) is not None:
+                old_client.conn.mcp_endpoint_client = new_client
+                handler = getattr(old_client.conn, "func_handler", None)
+                if handler is not None:
+                    try:
+                        handler.upload_functions_desc()
+                        handler.current_support_functions()
+                    except Exception as e:
+                        logger.bind(tag=TAG).warning(f"重连后刷新工具缓存失败: {e}")
+            logger.bind(tag=TAG).info("MCP 接入点重连成功")
+            return
+    finally:
+        old_client.reconnecting = False
 
 
 async def handle_mcp_endpoint_message(mcp_client: MCPEndpointClient, message: str):
@@ -367,7 +426,11 @@ async def call_mcp_endpoint_tool(
     logger.bind(tag=TAG).info(
         f"发送MCP接入点工具调用请求: {actual_name}，参数: {json.dumps(arguments, ensure_ascii=False)}{log_suffix}"
     )
-    await mcp_client.send_message(message)
+    try:
+        await mcp_client.send_message(message)
+    except Exception as e:
+        await mcp_client.cleanup_call_result(tool_call_id)
+        raise RuntimeError("发送 MCP 工具调用失败：" + str(e)) from e
 
     try:
         # Wait for response or timeout

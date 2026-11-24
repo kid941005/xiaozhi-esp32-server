@@ -7,6 +7,10 @@ from core.utils.voiceprint_provider import SpeakerIdentification
 from .mcp_endpoint_handler import call_mcp_endpoint_tool
 from .mcp_speaker import should_forward_speaker, speaker_call_meta
 
+# 只接受协议允许的 action 枚举名；绝不能把未知字符串（如 turn_off）当枚举索引，
+# 否则会在 xiaozhi 侧抛 KeyError 并被 TTS 直接念出英文动作名。
+_ACTION_NAMES = {a.name for a in Action}
+
 
 class MCPEndpointExecutor(ToolExecutor):
     """MCP接入点工具执行器"""
@@ -54,23 +58,37 @@ class MCPEndpointExecutor(ToolExecutor):
                 except Exception as e:
                     pass
 
-            # 视觉大模型不经过二次LLM处理
+            # 视觉大模型不经过二次LLM处理；action 必须在协议枚举内，否则走 REQLLM
             if (
                 resultJson is not None
                 and isinstance(resultJson, dict)
                 and "action" in resultJson
+                and str(resultJson.get("action")) in _ACTION_NAMES
             ):
+                response = resultJson.get("response", "")
+                if not isinstance(response, str):
+                    response = str(response)
                 return ActionResponse(
-                    action=Action[resultJson["action"]],
-                    response=resultJson.get("response", ""),
+                    action=Action[str(resultJson["action"])],
+                    response=response,
                 )
 
-            return ActionResponse(action=Action.REQLLM, result=str(result))
+            # 未知/缺失 action 一律回退到 REQLLM，由 LLM 结合结果生成自然语言，
+            # 不把内部字符串直接送入 TTS。
+            fallback = resultJson if resultJson is not None else result
+            return ActionResponse(
+                action=Action.REQLLM,
+                result=(
+                    json.dumps(fallback, ensure_ascii=False)
+                    if not isinstance(fallback, str)
+                    else fallback
+                ),
+            )
 
-        except ValueError as e:
-            return ActionResponse(action=Action.NOTFOUND, response=str(e))
-        except Exception as e:
-            return ActionResponse(action=Action.ERROR, response=str(e))
+        except ValueError:
+            return ActionResponse(action=Action.NOTFOUND, response="未找到对应的 MCP 工具。")
+        except Exception:
+            return ActionResponse(action=Action.ERROR, response="调用 MCP 工具失败，请稍后再试。")
 
     def get_tools(self) -> Dict[str, ToolDefinition]:
         """获取所有MCP接入点工具"""

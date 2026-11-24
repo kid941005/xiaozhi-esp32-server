@@ -92,3 +92,12 @@ python mcp_pipe.py calculator.py
 250705 -INFO-当前支持的函数列表: [ 'get_time', 'get_lunar', 'play_music', 'get_weather', 'handle_exit_intent', 'calculator']
 ```
 如果包含了 `'calculator'`，说明设备将可以根据意图识别，调用计算器这个工具。
+
+## 客户端加固说明
+
+小智后端侧的 MCP 接入点客户端已内置以下保护，无需额外配置：
+
+- 连接参数：`max_size=16MB`、`ping_interval=20s`、`ping_timeout=20s`、`open_timeout=15s`。
+- 断线处理：连接断开时立即唤醒所有等待中的工具调用并返回错误，不再挂到 30s 超时。
+- 自动重连：指数退避（1s 起，最长 600s，带随机抖动），重连成功后自动替换客户端并刷新工具列表。
+- 结果处理：MCP 服务返回未知 `action` 时回退给大模型生成自然语言，不会把内部英文动作名直接念给用户；异常统一转成中文友好提示。
