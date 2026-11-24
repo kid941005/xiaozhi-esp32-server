@@ -23,15 +23,20 @@ append_opt --spring.data.redis.password "${SPRING_DATA_REDIS_PASSWORD:-}"
 append_opt --spring.data.redis.port "${SPRING_DATA_REDIS_PORT:-}"
 
 JAVA_PID=""
+JAR_PATH=$(ls /app/*-api.jar 2>/dev/null | head -n 1)
 if [ -z "${SPRING_DATASOURCE_DRUID_URL:-}" ]; then
   echo "[start.sh] 警告：未设置 SPRING_DATASOURCE_DRUID_URL，Java 后端不启动，仅提供静态页面（接口将 502）。" >&2
 else
-  java -jar /app/xiaozhi-api.jar "${JAVA_ARGS[@]}" &
-  JAVA_PID=$!
-  sleep 3
-  if ! kill -0 "$JAVA_PID" 2>/dev/null; then
-    echo "[start.sh] 警告：Java 后端启动后立即退出，请检查数据库/Redis 环境变量是否正确。" >&2
-    JAVA_PID=""
+  if [ -z "$JAR_PATH" ]; then
+    echo "[start.sh] 警告：未在 /app 找到 *-api.jar，Java 后端不启动。" >&2
+  else
+    java -jar "$JAR_PATH" "${JAVA_ARGS[@]}" &
+    JAVA_PID=$!
+    sleep 3
+    if ! kill -0 "$JAVA_PID" 2>/dev/null; then
+      echo "[start.sh] 警告：Java 后端启动后立即退出，请检查数据库/Redis 环境变量是否正确。" >&2
+      JAVA_PID=""
+    fi
   fi
 fi
 

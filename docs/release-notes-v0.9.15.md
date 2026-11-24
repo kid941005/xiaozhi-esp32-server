@@ -25,6 +25,7 @@ failed to convert java.lang.String to int
 - 未设置 `SPRING_DATASOURCE_DRUID_URL` 时明确打印警告：只提供静态页面，接口将 502。
 - Java 进程启动后 3 秒内退出时打印警告，提示检查数据库/Redis 环境变量。
 - 容器收到 TERM/INT 时清理 Java 子进程。
+- 启动时不再写死 JAR 文件名，改为解析 `/app/*-api.jar`（构建产物名含仓库名，写死会因文件名不符导致 `Unable to access jarfile`）。
 
 ## 验证
 
@@ -41,3 +42,4 @@ failed to convert java.lang.String to int
 ## 包含的提交
 
 - `7e0972a6` fix(docker): web 镜像启动脚本仅在环境变量非空时传参，避免 Spring 因空值退出而 Nginx 假健康
+- fix(docker): 启动脚本按 `/app/*-api.jar` 解析 JAR 路径
