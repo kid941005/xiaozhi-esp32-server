@@ -3,7 +3,6 @@
 import json
 from typing import Dict, List, Any, Optional
 from config.logger import setup_logging
-from plugins_func.loadplugins import auto_import_modules
 
 from .base import ToolType
 from plugins_func.register import Action, ActionResponse
@@ -57,8 +56,9 @@ class UnifiedToolHandler:
     async def _initialize(self):
         """异步初始化"""
         try:
-            # 自动导入插件模块
-            auto_import_modules("plugins_func.functions")
+            # 插件模块按需加载：此处不再全量 import，
+            # 由 ServerPluginExecutor.get_tools() 依据「必要函数 + 配置启用的插件」按需导入，
+            # 未启用的插件不会执行模块级代码，单个插件损坏也不会拖垮整个工具处理器。
 
             # 初始化服务端MCP
             await self.server_mcp_executor.initialize()

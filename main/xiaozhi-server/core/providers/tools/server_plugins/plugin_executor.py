@@ -8,6 +8,7 @@ from typing import Dict, Any, TYPE_CHECKING
 if TYPE_CHECKING:
     from core.connection import ConnectionHandler
 from ..base import ToolType, ToolDefinition, ToolExecutor
+from plugins_func.loadplugins import ensure_plugins_loaded
 from plugins_func.register import all_function_registry, module_func_map, Action, ActionResponse
 
 # 插件专用线程池：不用 asyncio 默认池（DNS 解析、ASR、initialize_modules 等都在用），
@@ -96,7 +97,11 @@ class ServerPluginExecutor(ToolExecutor):
         return ""
 
     def get_tools(self) -> Dict[str, ToolDefinition]:
-        """获取所有注册的服务端插件工具"""
+        """获取所有注册的服务端插件工具
+
+        插件模块按需加载：只为「必要函数 + 本次配置启用的插件」import 对应模块，
+        未启用的插件不会被执行模块级代码，单个插件加载失败也不会影响其它插件。
+        """
         tools = {}
 
         # 获取必要的函数
@@ -107,8 +112,23 @@ class ServerPluginExecutor(ToolExecutor):
             self.config["selected_module"]["Intent"]
         ].get("functions", [])
 
+        # 统一成列表：智控台下发为 list，本地配置也可能是 "a;b" 形式
+        if isinstance(config_functions, str):
+            raw_functions = [n.strip() for n in config_functions.split(";") if n.strip()]
+        else:
+            try:
+                raw_functions = [str(n) for n in config_functions if n]
+            except TypeError:
+                raw_functions = []
+
+        # 按需加载所需插件模块（未命中的名字回退全量兜底，且逐个容错）
+        ensure_plugins_loaded(
+            list(necessary_functions) + raw_functions,
+            log=getattr(self.conn, "logger", None),
+        )
+
         # 将模块级别的插件名展开为具体函数名（兜底机制）
-        config_functions = self._expand_plugin_names(config_functions)
+        config_functions = self._expand_plugin_names(raw_functions)
 
         # 合并所有需要的函数
         all_required_functions = list(set(necessary_functions + config_functions))
