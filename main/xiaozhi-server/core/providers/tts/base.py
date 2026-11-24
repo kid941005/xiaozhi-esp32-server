@@ -502,7 +502,6 @@ class TTSProviderBase(ABC):
     # 德语句子的切分只能靠“不平衡就顺延”保守处理（最终由 flush 兜底）。
     _CLOSERS = '」』”》）"»“】〉］]'
     _QUOTE_CHARS = "".join(ch for pair in _QUOTE_PAIRS for ch in pair)
-
     # 数字内部的千分位/时间分隔符，不能当作句末断句标点（#3553）
     _NUMERIC_SEPARATORS = {"，", ",", "：", ":"}
 
@@ -530,9 +529,7 @@ class TTSProviderBase(ABC):
         candidates = [pos] + [
             i
             for i, ch in enumerate(text)
-            if i > pos
-            and ch in punctuations
-            and not cls._is_numeric_separator(text, i)
+            if i > pos and ch in punctuations and not cls._is_numeric_separator(text, i)
         ]
         for candidate in candidates:
             end = candidate + 1
