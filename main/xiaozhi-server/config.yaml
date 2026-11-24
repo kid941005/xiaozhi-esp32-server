@@ -302,8 +302,9 @@ Intent:
       - web_search
       - get_weather
       - get_news_from_newsnow
-      - play_music
-      # 飞牛音乐网关（需先填写 plugins.fnmusic_gateway.base_url）
+      # 音乐播放内置插件已禁用：音乐统一走自建 MCP 服务（飞牛音乐 MCP）
+      # - play_music
+      # 飞牛音乐网关 REST 插件同样不启用（MCP 接入方式不需要它）
       # - fnmusic_gateway
   function_call:
     # 不需要动type
@@ -318,10 +319,11 @@ Intent:
       # - search_from_ragflow
       # - get_news_from_chinanews
       - get_news_from_newsnow
-      # play_music是服务器自带的音乐播放，hass_play_music是通过home assistant控制的独立外部程序音乐播放
-      # 如果用了hass_play_music，就不要开启play_music，两者只留一个
-      - play_music
-      # 飞牛音乐网关：播放 NAS 音乐库，支持随机与单曲/列表循环（需先填写 plugins.fnmusic_gateway.base_url）
+      # 以下内置插件已全部禁用，音乐/家居统一走自建的 MCP 服务（飞牛音乐 MCP、Home Assistant MCP）：
+      #   play_music        服务器本地音乐目录播放
+      #   fnmusic_gateway   飞牛音乐网关 REST 桥接插件（MCP 接入方式不需要）
+      #   hass_state / hass_play_music   Home Assistant 直连插件
+      # - play_music
       # - fnmusic_gateway
       #- hass_state
       #- hass_play_music
