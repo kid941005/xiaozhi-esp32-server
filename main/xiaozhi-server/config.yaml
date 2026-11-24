@@ -184,6 +184,14 @@ plugins:
       - ".wav"
       - ".p3"
     refresh_time: 300 # 刷新音乐列表的时间间隔，单位为秒
+  fnmusic_gateway:
+    # 飞牛音乐网关（fnmusic-gateway）地址，留空表示不启用本组工具
+    base_url: ""  # 例如 http://192.168.50.100:8766
+    enabled: true  # 关闭后 fnmusic_* 工具会提示未配置
+    timeout: 10  # 请求网关的超时时间，单位为秒
+    quality: ""  # 音质参数，留空使用网关默认值
+    device_tool: "self.music.play_url"  # 设备端播放工具名
+    stop_tool: "self.music.stop"  # 设备端停止工具名
   search_from_ragflow:
     # 知识库的描述信息，方便大语言模型知道什么时候调用
     description: "当用户问xxx时，调用本方法，使用知识库中的信息回答问题"
@@ -295,6 +303,8 @@ Intent:
       - get_weather
       - get_news_from_newsnow
       - play_music
+      # 飞牛音乐网关（需先填写 plugins.fnmusic_gateway.base_url）
+      # - fnmusic_gateway
   function_call:
     # 不需要动type
     type: function_call
@@ -311,6 +321,8 @@ Intent:
       # play_music是服务器自带的音乐播放，hass_play_music是通过home assistant控制的独立外部程序音乐播放
       # 如果用了hass_play_music，就不要开启play_music，两者只留一个
       - play_music
+      # 飞牛音乐网关：播放 NAS 音乐库，支持随机与单曲/列表循环（需先填写 plugins.fnmusic_gateway.base_url）
+      # - fnmusic_gateway
       #- hass_state
       #- hass_play_music
 
