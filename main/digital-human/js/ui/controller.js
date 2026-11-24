@@ -839,13 +839,19 @@ class UIController {
         const toolId = `mcp-tool-${Date.now()}`;
         const toolDiv = document.createElement('div');
         toolDiv.className = 'properties-container';
+        toolDiv.id = toolId;
         toolDiv.innerHTML = `
             <div class="property-item">
                 <input type="text" placeholder="工具名称" value="新工具">
                 <input type="text" placeholder="工具描述" value="工具描述">
-                <button class="remove-property" onclick="uiController.removeMCPTool('${toolId}')">删除</button>
+                <button class="remove-property" type="button">删除</button>
             </div>
         `;
+        // 用事件监听绑定删除，避免内联 onclick 依赖全局 uiController
+        const removeBtn = toolDiv.querySelector('.remove-property');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', () => this.removeMCPTool(toolId));
+        }
 
         mcpToolsList.appendChild(toolDiv);
     }

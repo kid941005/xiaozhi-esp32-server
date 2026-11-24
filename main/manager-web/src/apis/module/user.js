@@ -82,23 +82,6 @@ export default {
                 })
             }).send()
     },
-    // 保存设备配置
-    saveDeviceConfig(device_id, configData, callback) {
-        RequestService.sendRequest()
-            .url(`${getServiceUrl()}/user/configDevice/${device_id}`)
-            .method('PUT')
-            .data(configData)
-            .success((res) => {
-                RequestService.clearRequestTime();
-                callback(res);
-            })
-            .networkFail((err) => {
-                console.error('保存配置失败:', err);
-                RequestService.reAjaxFun(() => {
-                    this.saveDeviceConfig(device_id, configData, callback);
-                });
-            }).send();
-    },
     // 用户信息获取
     getUserInfo(callback) {
         RequestService.sendRequest()

@@ -84,7 +84,7 @@ async function testServerBaseUrl() {
 
   try {
     const response = await uni.request({
-      url: `${baseUrlInput.value}/api/ping`,
+      url: `${baseUrlInput.value}/user/pub-config`,
       method: 'GET',
       timeout: 3000,
     })
