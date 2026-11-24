@@ -2,6 +2,54 @@
 
 本版修复**智控台（web）镜像启动脚本**的一处健壮性缺陷，并改善容器内后端启动失败时的可见性。无应用代码、数据库或接口变更。
 
+## 镜像
+
+| 镜像地址 | 说明 |
+|---|---|
+| `kid941005/xiaozhi-esp32-server:v0.9.15` | Docker Hub（public，无需登录），服务端固定版本，建议用于生产部署与回滚 |
+| `kid941005/xiaozhi-esp32-server:latest` | Docker Hub（public），服务端跟随最近一次发布，当前等同 `v0.9.15` |
+| `kid941005/xiaozhi-esp32-server:web_0.9.15` | Docker Hub（public），智控台（前端 + manager-api）固定版本 |
+| `kid941005/xiaozhi-esp32-server:web_latest` | Docker Hub（public），智控台跟随最近一次发布 |
+| `ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.15` | GHCR（public，无需登录），服务端固定版本 |
+| `ghcr.io/kid941005/xiaozhi-esp32-server:latest` | GHCR（public，无需登录），服务端跟随最近一次发布，当前等同 `v0.9.15` |
+| `ghcr.io/kid941005/xiaozhi-esp32-server:web_0.9.15` | GHCR（public），智控台固定版本（多架构 amd64 + arm64） |
+| `ghcr.io/kid941005/xiaozhi-esp32-server:web_latest` | GHCR（public），智控台跟随最近一次发布（多架构） |
+
+镜像 digest（同一提交、不同构建环境，内容等价）：
+- Docker Hub 服务端：`sha256:565fa7c786379f72773c32fdce7f718d4b28017c26a3d83047dec66949c77bdf`（linux/amd64，压缩约 3.5 GB / 解压 10.8 GB）
+- GHCR 服务端：`sha256:565fa7c786379f72773c32fdce7f718d4b28017c26a3d83047dec66949c77bdf`（linux/amd64，10.8 GB）
+- Docker Hub 智控台：`sha256:e8d9b512fb0e69db1bb1653727c49a479723af5f3ba7278df872ab1c04e620cb`（linux/amd64）
+- GHCR 智控台：`sha256:67150269225b9719b402d6a844904986b18c91f87a64e7b4ba758edaec977b5d`（多架构 index，amd64 + arm64）
+
+拉取与使用：
+
+```bash
+# 服务端（public，可直接拉取）
+docker pull kid941005/xiaozhi-esp32-server:v0.9.15
+docker pull ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.15          # GHCR 备用
+
+# 智控台（public，可直接拉取）
+docker pull kid941005/xiaozhi-esp32-server:web_0.9.15
+docker pull ghcr.io/kid941005/xiaozhi-esp32-server:web_0.9.15   # GHCR 备用（多架构）
+```
+
+在 `docker-compose.yml` 中替换对应服务的 `image` 即可，例如：
+
+```yaml
+services:
+  xiaozhi-esp32-server:
+    image: kid941005/xiaozhi-esp32-server:v0.9.15            # Docker Hub
+    # image: ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.15  # GHCR 备用
+  manager-web:
+    image: kid941005/xiaozhi-esp32-server:web_0.9.15        # Docker Hub（智控台）
+```
+
+> Docker Hub 与 GHCR 上的镜像均为 **public**，可直接拉取、无需登录。若 GHCR 仍报 `unauthorized` / `denied`，多半是本地缓存了旧的私有凭据：先 `docker logout ghcr.io` 再重试。
+
+> 服务端镜像由流水线 [`.github/workflows/dockerhub-image.yml`](.github/workflows/dockerhub-image.yml) 构建：推送 `v*.*.*` 标签或手动触发时，一次构建同时发布到 GHCR 与 Docker Hub。
+
+> 智控台 web 镜像同样由该流水线构建并推送到 Docker Hub；GHCR 上的 web 镜像（多架构 amd64 + arm64）由 [`.github/workflows/docker-image.yml`](.github/workflows/docker-image.yml) 发布，两者标签格式均为 `web_<版本>`。
+
 ## 修复：环境变量缺失时智控台后端静默退出
 
 `docs/docker/start.sh` 原实现无条件把所有 Spring 参数拼进启动命令：
