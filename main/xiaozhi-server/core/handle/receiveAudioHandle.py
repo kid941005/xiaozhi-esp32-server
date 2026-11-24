@@ -14,6 +14,20 @@ from core.handle.sendAudioHandle import send_stt_message, SentenceType
 TAG = __name__
 
 
+def _normalize_music_text(text):
+    """归一化 ASR 常见的音乐指令同音误识别（如“切割”→“切歌”）。
+
+    function_call 模式会在意图处理里提前返回，后续 send_stt_message/conn.chat
+    使用的文本不会再经过 intentHandler 的归一化，因此入口统一处理一次。
+    """
+    try:
+        from plugins_func.functions.play_music import normalize_music_text
+
+        return normalize_music_text(text)
+    except Exception:
+        return text
+
+
 async def handleAudioMessage(conn: "ConnectionHandler", pcm_frame):
     # 当前片段是否有人说话
     have_voice = conn.vad.is_vad(conn, pcm_frame)
@@ -69,6 +83,9 @@ async def startToChat(conn: "ConnectionHandler", text, speaker=None):
     except (json.JSONDecodeError, KeyError):
         # 如果解析失败，继续使用原始文本
         pass
+
+    # ASR 同音词纠错必须在 function_call 提前返回前生效
+    actual_text = _normalize_music_text(actual_text)
 
     # 说话人名供提示词注入；声纹身份走 speaker 快照，不挂连接
     conn.current_speaker = speaker_name
