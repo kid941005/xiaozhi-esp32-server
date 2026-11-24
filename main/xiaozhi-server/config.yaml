@@ -296,7 +296,7 @@ Intent:
     # 如果你的不想使用selected_module.LLM意图识别，这里最好使用独立的LLM作为意图识别，例如使用免费的ChatGLMLLM
     llm: ChatGLMLLM
     # plugins_func/functions下的模块，可以通过配置，选择加载哪个模块，加载后对话支持相应的function调用
-    # 系统默认已经记载"handle_exit_intent(退出识别)"、"play_music(音乐播放)"插件，请勿重复加载
+    # 系统始终提供 handle_exit_intent(退出识别)、get_lunar(农历/时间) 两个工具；其余插件需在此列出（或由智控台勾选）才会加载
     # 下面是加载查天气、角色切换、加载查新闻的插件示例
     functions:
       - web_search
@@ -310,7 +310,7 @@ Intent:
     # 不需要动type
     type: function_call
     # plugins_func/functions下的模块，可以通过配置，选择加载哪个模块，加载后对话支持相应的function调用
-    # 系统默认已经记载"handle_exit_intent(退出识别)"、"play_music(音乐播放)"插件，请勿重复加载
+    # 系统始终提供 handle_exit_intent(退出识别)、get_lunar(农历/时间) 两个工具；其余插件需在此列出（或由智控台勾选）才会加载
     # 下面是加载查天气、角色切换、加载查新闻的插件示例
     functions:
       - change_role
