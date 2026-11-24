@@ -190,35 +190,35 @@ Websocket接口地址: wss://2662r3426b.vicp.fun/xiaozhi/v1/
 
 <!-- IMAGES:BEGIN -->
 
-本 fork 提供已构建好的服务端与智控台镜像（含安全加固、上下文源并发化、工具调用治理与测试工程化，详见 [v0.9.13 Release](https://github.com/kid941005/xiaozhi-esp32-server/releases/tag/v0.9.13)）：
+本 fork 提供已构建好的服务端与智控台镜像（含安全加固、上下文源并发化、工具调用治理与测试工程化，详见 [v0.9.14 Release](https://github.com/kid941005/xiaozhi-esp32-server/releases/tag/v0.9.14)）：
 
 | 镜像地址 | 说明 |
 |---|---|
-| `kid941005/xiaozhi-esp32-server:v0.9.13` | Docker Hub（public，无需登录），服务端固定版本，建议用于生产部署与回滚 |
-| `kid941005/xiaozhi-esp32-server:latest` | Docker Hub（public），服务端跟随最近一次发布，当前等同 `v0.9.13` |
-| `kid941005/xiaozhi-esp32-server:web_0.9.13` | Docker Hub（public），智控台（前端 + manager-api）固定版本 |
+| `kid941005/xiaozhi-esp32-server:v0.9.14` | Docker Hub（public，无需登录），服务端固定版本，建议用于生产部署与回滚 |
+| `kid941005/xiaozhi-esp32-server:latest` | Docker Hub（public），服务端跟随最近一次发布，当前等同 `v0.9.14` |
+| `kid941005/xiaozhi-esp32-server:web_0.9.14` | Docker Hub（public），智控台（前端 + manager-api）固定版本 |
 | `kid941005/xiaozhi-esp32-server:web_latest` | Docker Hub（public），智控台跟随最近一次发布 |
-| `ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.13` | GHCR（public，无需登录），服务端固定版本 |
-| `ghcr.io/kid941005/xiaozhi-esp32-server:latest` | GHCR（public，无需登录），服务端跟随最近一次发布，当前等同 `v0.9.13` |
-| `ghcr.io/kid941005/xiaozhi-esp32-server:web_0.9.13` | GHCR（public），智控台固定版本（多架构 amd64 + arm64） |
+| `ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.14` | GHCR（public，无需登录），服务端固定版本 |
+| `ghcr.io/kid941005/xiaozhi-esp32-server:latest` | GHCR（public，无需登录），服务端跟随最近一次发布，当前等同 `v0.9.14` |
+| `ghcr.io/kid941005/xiaozhi-esp32-server:web_0.9.14` | GHCR（public），智控台固定版本（多架构 amd64 + arm64） |
 | `ghcr.io/kid941005/xiaozhi-esp32-server:web_latest` | GHCR（public），智控台跟随最近一次发布（多架构） |
 
 镜像 digest（同一提交、不同构建环境，内容等价）：
-- Docker Hub 服务端：`sha256:10a05c92bd29daac088784ce7ac9297f64fd2dd9314edddd5918e195b7700f1e`（linux/amd64，压缩约 3.5 GB / 解压 10.8 GB）
-- GHCR 服务端：`sha256:10a05c92bd29daac088784ce7ac9297f64fd2dd9314edddd5918e195b7700f1e`（linux/amd64，10.8 GB）
-- Docker Hub 智控台：`sha256:5fbbe935eae293e3b85d0b7659975261e817104c96366a17468c599c6556a9a5`（linux/amd64）
-- GHCR 智控台：`sha256:1e75916af7fdcf845b03cae5b5dcc2aa1904d40611340c9c3213b3f68235c72a`（多架构 index，amd64 + arm64）
+- Docker Hub 服务端：`sha256:4ea6ef3b469eb4b0849b0ac14bab44bafe8ea8e62581da72926d517612937ae1`（linux/amd64，压缩约 3.5 GB / 解压 10.8 GB）
+- GHCR 服务端：`sha256:4ea6ef3b469eb4b0849b0ac14bab44bafe8ea8e62581da72926d517612937ae1`（linux/amd64，10.8 GB）
+- Docker Hub 智控台：`sha256:12ad6fb509a6ad2e262a1dddedce7c9be8ef809e7f95fb3203957063fc24efa9`（linux/amd64）
+- GHCR 智控台：`sha256:3ba9abfb3800e8218f945416fb1aa2ebfc2114cc5324d390e44419bd531b485b`（多架构 index，amd64 + arm64）
 
 拉取与使用：
 
 ```bash
 # 服务端（public，可直接拉取）
-docker pull kid941005/xiaozhi-esp32-server:v0.9.13
-docker pull ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.13          # GHCR 备用
+docker pull kid941005/xiaozhi-esp32-server:v0.9.14
+docker pull ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.14          # GHCR 备用
 
 # 智控台（public，可直接拉取）
-docker pull kid941005/xiaozhi-esp32-server:web_0.9.13
-docker pull ghcr.io/kid941005/xiaozhi-esp32-server:web_0.9.13   # GHCR 备用（多架构）
+docker pull kid941005/xiaozhi-esp32-server:web_0.9.14
+docker pull ghcr.io/kid941005/xiaozhi-esp32-server:web_0.9.14   # GHCR 备用（多架构）
 ```
 
 在 `docker-compose.yml` 中替换对应服务的 `image` 即可，例如：
@@ -226,10 +226,10 @@ docker pull ghcr.io/kid941005/xiaozhi-esp32-server:web_0.9.13   # GHCR 备用（
 ```yaml
 services:
   xiaozhi-esp32-server:
-    image: kid941005/xiaozhi-esp32-server:v0.9.13            # Docker Hub
-    # image: ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.13  # GHCR 备用
+    image: kid941005/xiaozhi-esp32-server:v0.9.14            # Docker Hub
+    # image: ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.14  # GHCR 备用
   manager-web:
-    image: kid941005/xiaozhi-esp32-server:web_0.9.13        # Docker Hub（智控台）
+    image: kid941005/xiaozhi-esp32-server:web_0.9.14        # Docker Hub（智控台）
 ```
 
 > Docker Hub 与 GHCR 上的镜像均为 **public**，可直接拉取、无需登录。若 GHCR 仍报 `unauthorized` / `denied`，多半是本地缓存了旧的私有凭据：先 `docker logout ghcr.io` 再重试。

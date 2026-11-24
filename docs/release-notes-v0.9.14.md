@@ -4,6 +4,52 @@
 
 ## 镜像
 
+| 镜像地址 | 说明 |
+|---|---|
+| `kid941005/xiaozhi-esp32-server:v0.9.14` | Docker Hub（public，无需登录），服务端固定版本，建议用于生产部署与回滚 |
+| `kid941005/xiaozhi-esp32-server:latest` | Docker Hub（public），服务端跟随最近一次发布，当前等同 `v0.9.14` |
+| `kid941005/xiaozhi-esp32-server:web_0.9.14` | Docker Hub（public），智控台（前端 + manager-api）固定版本 |
+| `kid941005/xiaozhi-esp32-server:web_latest` | Docker Hub（public），智控台跟随最近一次发布 |
+| `ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.14` | GHCR（public，无需登录），服务端固定版本 |
+| `ghcr.io/kid941005/xiaozhi-esp32-server:latest` | GHCR（public，无需登录），服务端跟随最近一次发布，当前等同 `v0.9.14` |
+| `ghcr.io/kid941005/xiaozhi-esp32-server:web_0.9.14` | GHCR（public），智控台固定版本（多架构 amd64 + arm64） |
+| `ghcr.io/kid941005/xiaozhi-esp32-server:web_latest` | GHCR（public），智控台跟随最近一次发布（多架构） |
+
+镜像 digest（同一提交、不同构建环境，内容等价）：
+- Docker Hub 服务端：`sha256:4ea6ef3b469eb4b0849b0ac14bab44bafe8ea8e62581da72926d517612937ae1`（linux/amd64，压缩约 3.5 GB / 解压 10.8 GB）
+- GHCR 服务端：`sha256:4ea6ef3b469eb4b0849b0ac14bab44bafe8ea8e62581da72926d517612937ae1`（linux/amd64，10.8 GB）
+- Docker Hub 智控台：`sha256:12ad6fb509a6ad2e262a1dddedce7c9be8ef809e7f95fb3203957063fc24efa9`（linux/amd64）
+- GHCR 智控台：`sha256:3ba9abfb3800e8218f945416fb1aa2ebfc2114cc5324d390e44419bd531b485b`（多架构 index，amd64 + arm64）
+
+拉取与使用：
+
+```bash
+# 服务端（public，可直接拉取）
+docker pull kid941005/xiaozhi-esp32-server:v0.9.14
+docker pull ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.14          # GHCR 备用
+
+# 智控台（public，可直接拉取）
+docker pull kid941005/xiaozhi-esp32-server:web_0.9.14
+docker pull ghcr.io/kid941005/xiaozhi-esp32-server:web_0.9.14   # GHCR 备用（多架构）
+```
+
+在 `docker-compose.yml` 中替换对应服务的 `image` 即可，例如：
+
+```yaml
+services:
+  xiaozhi-esp32-server:
+    image: kid941005/xiaozhi-esp32-server:v0.9.14            # Docker Hub
+    # image: ghcr.io/kid941005/xiaozhi-esp32-server:v0.9.14  # GHCR 备用
+  manager-web:
+    image: kid941005/xiaozhi-esp32-server:web_0.9.14        # Docker Hub（智控台）
+```
+
+> Docker Hub 与 GHCR 上的镜像均为 **public**，可直接拉取、无需登录。若 GHCR 仍报 `unauthorized` / `denied`，多半是本地缓存了旧的私有凭据：先 `docker logout ghcr.io` 再重试。
+
+> 服务端镜像由流水线 [`.github/workflows/dockerhub-image.yml`](.github/workflows/dockerhub-image.yml) 构建：推送 `v*.*.*` 标签或手动触发时，一次构建同时发布到 GHCR 与 Docker Hub。
+
+> 智控台 web 镜像同样由该流水线构建并推送到 Docker Hub；GHCR 上的 web 镜像（多架构 amd64 + arm64）由 [`.github/workflows/docker-image.yml`](.github/workflows/docker-image.yml) 发布，两者标签格式均为 `web_<版本>`。
+
 ## 流水线：Docker Hub 同步发布智控台镜像
 
 - `.github/workflows/dockerhub-image.yml` 新增 `publish-web` job：构建 `Dockerfile-web`（Node 构建 manager-web 前端 + Maven 打包 manager-api + Nginx，端口 8002），推送到 Docker Hub，标签为 `web_<版本>` / `web_latest`。
