@@ -4,7 +4,8 @@ version: '3'
 services:
   # Server模块
   xiaozhi-esp32-server:
-    image: ghcr.nju.edu.cn/xinnan-tech/xiaozhi-esp32-server:server_latest
+    # 本 fork 预构建镜像（多架构 amd64/arm64）；Docker Hub 等价写法：kid941005/xiaozhi-esp32-server:latest
+    image: ghcr.io/kid941005/xiaozhi-esp32-server:server_latest
     container_name: xiaozhi-esp32-server
     depends_on:
       - xiaozhi-esp32-server-db
@@ -29,7 +30,8 @@ services:
 
   # manager-api和manager-web模块
   xiaozhi-esp32-server-web:
-    image: ghcr.nju.edu.cn/xinnan-tech/xiaozhi-esp32-server:web_latest
+    # 本 fork 预构建智控台镜像（多架构）；Docker Hub 等价写法：kid941005/xiaozhi-esp32-server:web_latest
+    image: ghcr.io/kid941005/xiaozhi-esp32-server:web_latest
     container_name: xiaozhi-esp32-server-web
     restart: always
     networks:

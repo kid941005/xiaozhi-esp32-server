@@ -3,7 +3,8 @@
 version: '3'
 services:
   xiaozhi-esp32-server:
-    image: ghcr.nju.edu.cn/xinnan-tech/xiaozhi-esp32-server:server_latest
+    # 本 fork 预构建镜像（多架构 amd64/arm64）；Docker Hub 等价写法：kid941005/xiaozhi-esp32-server:latest
+    image: ghcr.io/kid941005/xiaozhi-esp32-server:server_latest
     container_name: xiaozhi-esp32-server
     restart: always
     security_opt:
