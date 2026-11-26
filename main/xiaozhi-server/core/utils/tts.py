@@ -32,7 +32,11 @@ punctuation_set = {
 
 def create_instance(class_name, *args, **kwargs):
     # 创建TTS实例
-    if os.path.exists(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'providers', 'tts', f'{class_name}.py')):
+    # 以本文件位置为基准解析 provider 目录，避免依赖进程工作目录
+    provider_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "providers", "tts"
+    )
+    if os.path.exists(os.path.join(provider_dir, f'{class_name}.py')):
         lib_name = f'core.providers.tts.{class_name}'
         if lib_name not in sys.modules:
             sys.modules[lib_name] = importlib.import_module(f'{lib_name}')
@@ -102,34 +106,66 @@ class MarkdownCleaner:
 
         return "\n".join(lines_for_tts) + "\n"
 
+    @staticmethod
+    def _replace_emphasis(m: re.Match) -> str:
+        """* 斜体：内容是 ASCII 词字符/数字/运算符且左侧紧贴 ASCII 词字符时保留标记。
+
+        内容判定区分乘法与强调，左侧判定区分词内与独立强调。
+        """
+        before = m.string[m.start() - 1] if m.start() > 0 else ""
+        if not (before.isascii() and before.isalnum()):
+            return m.group(m.re.groups)
+        if not re.fullmatch(r"[A-Za-z0-9_+\-*/().\s]+", m.group(1)):
+            return m.group(m.re.groups)
+        return m.group(0)
+
+    @staticmethod
+    def _replace_underscore(m: re.Match) -> str:
+        """_ 斜体：词内不生效（CommonMark），任一侧紧贴 ASCII 词字符即保留标记。"""
+        before = m.string[m.start() - 1] if m.start() > 0 else ""
+        after = m.string[m.end()] if m.end() < len(m.string) else ""
+        before_word = before.isascii() and before.isalnum()
+        after_word = after.isascii() and after.isalnum()
+        if before_word or after_word:
+            return m.group(0)
+        return m.group(m.re.groups)
+
+    @staticmethod
+    def _replace_lone_marker(m: re.Match) -> str:
+        """落单的 ** ：左侧是词字符或参数列表分隔符时保留（幂运算/解包），否则剥掉。"""
+        before = m.string[m.start() - 1] if m.start() > 0 else ""
+        if before and (before.isascii() and before.isalnum() or before in "(,"):
+            return m.group(0)
+        return ""
+
     # 预编译所有正则表达式（按执行频率排序）
-    # 这里要把 replace_xxx 的静态方法放在最前定义，以便在列表里能正确引用它们。
+    # replace_xxx 的静态方法必须定义在此列表之前，列表里统一取 __func__
     REGEXES = [
         (re.compile(r'```.*?```', re.DOTALL), ''),  # 代码块
         (re.compile(r'^#+\s*', re.MULTILINE), ''),  # 标题
-        (re.compile(r'(\*\*|__)(.*?)\1'), r'\2'),  # 粗体
-        # 斜体：* 仅在两侧都不是字母/数字时才算斜体标记（避免吃掉 2*3*4 的乘号）
-        (
-            re.compile(r'(?<![A-Za-z0-9])\*(?=\S)(.*?)(?<=\S)\*(?![A-Za-z0-9])'),
-            r'\1',
-        ),
-        # 斜体：_ 仅在两侧都不是字母/数字/下划线时才算（避免吃掉 get_current_time 这类标识符）
-        (
-            re.compile(r'(?<![A-Za-z0-9_])_(?=\S)(.*?)(?<=\S)_(?![A-Za-z0-9_])'),
-            r'\1',
-        ),
+        # 粗体
+        (re.compile(r'\*\*(?=\S)(.+?)(?<=\S)\*\*'), r'\1'),
+        (re.compile(r'__(?=\S)(.+?)(?<=\S)__'), r'\1'),
+        # 千分位分组符（1_000_000 -> 1000000），整段数字须独立于标识符
+        (re.compile(r'(?<![A-Za-z_])\d+(?:_\d{3})+(?![\dA-Za-z_])'), lambda m: m.group(0).replace("_", "")),
+        # 斜体 * 和 _，内容允许内部空白
+        (re.compile(r'(?<!\*)\*(?!\*)(?=\S)((?:[^*\s]|[ \t])+?)(?<=\S)\*'), _replace_emphasis.__func__),
+        (re.compile(r'(?<!_)_(?!_)(?=\S)((?:[^_\s]|[ \t])+?)(?<=\S)_'), _replace_underscore.__func__),
         (re.compile(r'!\[.*?\]\(.*?\)'), ''),  # 图片
         (re.compile(r'\[(.*?)\]\(.*?\)'), r'\1'),  # 链接
         (re.compile(r'^\s*>+\s*', re.MULTILINE), ''),  # 引用
         (
             re.compile(r'(?P<table_block>(?:^[^\n]*\|[^\n]*\n)+)', re.MULTILINE),
-            _replace_table_block
+            _replace_table_block.__func__
         ),
-        (re.compile(r'^\s*[*+-]\s*', re.MULTILINE), '- '),  # 列表
+        # 列表，排除 ** 形态
+        (re.compile(r'^\s*(?!\*\*)[*+-]\s*', re.MULTILINE), '- '),
+        # 落单的 **
+        (re.compile(r'\*\*'), _replace_lone_marker.__func__),
         (re.compile(r'\$\$.*?\$\$', re.DOTALL), ''),  # 块级公式
         (
             re.compile(r'(?<![A-Za-z0-9])\$([^\n$]+)\$(?![A-Za-z0-9])'),
-            _replace_inline_dollar
+            _replace_inline_dollar.__func__
         ),
         (re.compile(r'\n{2,}'), '\n'),  # 多余空行
     ]
@@ -139,8 +175,6 @@ class MarkdownCleaner:
         """
         主入口方法：依序执行所有正则，移除或替换 Markdown 元素
         """
-        # 数字之间的下划线是千分位/分隔符而非 Markdown：1_000_000 -> 1000000
-        text = re.sub(r'(?<=\d)_(?=\d)', '', text)
         for regex, replacement in MarkdownCleaner.REGEXES:
             text = regex.sub(replacement, text)
 
